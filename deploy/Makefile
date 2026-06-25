@@ -92,6 +92,9 @@ fencing-assisted:
 keep-instance:
 	@../helpers/keep-instance.sh '$(DAYS)'
 
+sno-to-3node:
+	@./openshift-clusters/scripts/sno-to-3node.sh
+
 patch-nodes:
 	@./openshift-clusters/scripts/patch-nodes.sh
 get-tnf-logs:
@@ -128,6 +131,7 @@ help:
 	@echo "  fencing-assisted     - Deploy hub + spoke TNF cluster via assisted installer"
 	@echo "  sno-ipi              - Deploy Single Node OpenShift (SNO) IPI cluster (non-interactive)"
 	@echo "  sno-agent            - Deploy Single Node OpenShift (SNO) Agent cluster (non-interactive)"
+	@echo "  sno-to-3node         - Transition existing SNO cluster to 3-node HA (platform:none)"
 	@echo ""
 	@echo "OpenShift Cluster Management:"
 	@echo "  redeploy-cluster     - Redeploy OpenShift cluster using dev-scripts make redeploy"
