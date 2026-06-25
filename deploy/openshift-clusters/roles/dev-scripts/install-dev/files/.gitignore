@@ -3,3 +3,4 @@ ci_token
 clusterbot-ci_token
 config_arbiter.sh
 config_fencing.sh
+config_sno.sh

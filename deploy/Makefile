@@ -1,5 +1,5 @@
 # Valid cluster types for 'make deploy <cluster-type>'
-VALID_CLUSTER_TYPES := fencing-ipi fencing-agent fencing-assisted arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli
+VALID_CLUSTER_TYPES := fencing-ipi fencing-agent fencing-assisted arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli sno-ipi sno-agent
 
 # Handle 'make deploy <cluster-type>' pattern
 # When 'deploy' is first, validate any following arguments are valid cluster types
@@ -72,6 +72,12 @@ arbiter-ipi:
 
 arbiter-agent:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology arbiter --method agent
+
+sno-ipi:
+	@./openshift-clusters/scripts/deploy-cluster.sh --topology sno --method ipi
+
+sno-agent:
+	@./openshift-clusters/scripts/deploy-cluster.sh --topology sno --method agent
 
 arbiter-kcli:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology arbiter --method kcli
