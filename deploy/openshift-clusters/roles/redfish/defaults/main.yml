@@ -1,9 +1,0 @@
----
-# Default variables for the redfish role
-# These variables can be overridden when calling the role
-
-# BMH namespace where Bare Metal Hosts are deployed
-bmh_namespace: "openshift-machine-api"
-
-# SSL certificate verification setting
-ssl_insecure_param: ""

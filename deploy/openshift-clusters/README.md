@@ -183,17 +183,7 @@ For more information on STONITH, go to the [official RHEL HA documentation](http
 
 For clusters using the fencing topology on OpenShift 4.19.x, automatic Redfish stonith configuration is available. This feature configures Pacemaker stonith resources using Redfish fencing for BareMetalHost resources.
 
-Redfish configuration can be applied in two ways:
-
-**Integrated Usage:**
-- When running the main deployment playbook in interactive mode with fencing topology, you will be prompted to configure Redfish stonith automatically
-- Redfish configuration runs as part of the main deployment workflow
-
-**Standalone Usage:**
-- Redfish configuration can be run independently using: `ansible-playbook redfish.yml`
-- This allows for running it separately from the main deployment or re-running it if needed
-
-For detailed configuration options, verification commands, and requirements, refer to the [Redfish role documentation](roles/redfish/README.md).
+Fencing topology clusters use automatic fencing configuration via the cluster-etcd-operator (CEO). The CEO discovers BareMetalHost resources and configures STONITH automatically during installation. No manual Redfish configuration is required.
 
 
 ### Optional: Attaching Extra Disks

@@ -1,6 +1,6 @@
 ---
 # kcli-redfish role main tasks
-# Configures stonith fencing for kcli-deployed clusters
+# Starts ksushy BMC simulator for kcli fencing deployments
 
 - name: Install prerequisites
   include_tasks: prerequisites.yml
@@ -17,13 +17,11 @@
 - name: Display configuration
   debug:
     msg: |
-      kcli fencing configuration:
+      ksushy BMC simulator configuration:
       Cluster Name: {{ test_cluster_name }}
       Hypervisor IP: {{ ksushy_ip }}
       BMC User: {{ bmc_user }}
       BMC Port: {{ ksushy_port }}
-
-      Override with: ansible-playbook kcli-redfish.yml -e "test_cluster_name=my-cluster" -e "ksushy_ip=X.X.X.X"
 
 - name: Start ksushy BMC simulator
   include_tasks: start_ksushy.yml
