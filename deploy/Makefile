@@ -92,11 +92,14 @@ fencing-assisted:
 keep-instance:
 	@../helpers/keep-instance.sh '$(DAYS)'
 
-adopt-baremetal:
-	@./openshift-clusters/scripts/adopt-baremetal.sh
+baremetal-adopt:
+	@./openshift-clusters/scripts/baremetal-adopt.sh
 
-verify-baremetal:
-	@./openshift-clusters/scripts/adopt-baremetal.sh --verify-only
+baremetal-verify:
+	@./openshift-clusters/scripts/baremetal-adopt.sh --verify-only
+
+baremetal-wizard:
+	@./openshift-clusters/scripts/baremetal-wizard.sh
 
 patch-nodes:
 	@./openshift-clusters/scripts/patch-nodes.sh
@@ -145,8 +148,9 @@ help:
 	@echo "  patch-nodes          - Build resource-agents RPM and patch cluster nodes (default version: 4.11)"
 	@echo ""
 	@echo "Baremetal Adoption:"
-	@echo "  adopt-baremetal      - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
-	@echo "  verify-baremetal     - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
+	@echo "  baremetal-adopt      - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
+	@echo "  baremetal-verify     - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
+	@echo "  baremetal-wizard     - Interactive wizard to create baremetal node inventory"
 	@echo ""
 	@echo "Cluster Utilities:"
 	@echo "  get-tnf-logs         - Collect pacemaker and etcd logs from cluster nodes"
