@@ -9,17 +9,18 @@
 # Then run: make baremetal-adopt
 #
 # Each node requires:
-#   bmc_ip    - BMC/iDRAC/iLO management address (IP or hostname)
-#   bmc_user  - BMC login username
-#   bmc_pass  - BMC login password
-#   boot_mac  - MAC address of the NIC used for PXE boot
+#   bmc_address - BMC/iDRAC/iLO management address (IP or hostname)
+#   bmc_user   - BMC login username
+#   bmc_pass   - BMC login password
+#   boot_mac   - (optional) MAC address of the NIC used for PXE boot
+#                If omitted, the adopt script attempts Redfish discovery.
 #
 # The hostname (first field) becomes the node name in ironic_nodes.json.
 # For TNF, you need exactly 2 nodes (master-0 and master-1).
 
 [baremetal_nodes]
-master-0 bmc_ip=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01
-master-1 bmc_ip=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02
+master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01
+master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02
 
 [baremetal_nodes:vars]
 # BMC driver — only redfish is supported for TNF fencing

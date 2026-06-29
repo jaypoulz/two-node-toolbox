@@ -30,7 +30,7 @@ INVENTORY="${OC_DIR}/inventory_baremetal.ini"
 
 # Node data arrays — populated by parse_inventory
 declare -a NODE_NAMES=()
-declare -a NODE_BMC_IPS=()
+declare -a NODE_BMC_ADDRS=()
 declare -a NODE_BMC_USERS=()
 declare -a NODE_BMC_PASSES=()
 declare -a NODE_BOOT_MACS=()
@@ -128,26 +128,25 @@ parse_inventory() {
             name="${line%% *}"
             rest="${line#* }"
 
-            local bmc_ip="" bmc_user="" bmc_pass="" boot_mac=""
+            local bmc_address="" bmc_user="" bmc_pass="" boot_mac=""
             for pair in ${rest}; do
                 local key val
                 key="${pair%%=*}"
                 val="${pair#*=}"
                 case "${key}" in
-                    bmc_ip)   bmc_ip="${val}" ;;
+                    bmc_address)   bmc_address="${val}" ;;
                     bmc_user) bmc_user="${val}" ;;
                     bmc_pass) bmc_pass="${val}" ;;
                     boot_mac) boot_mac="${val}" ;;
                 esac
             done
 
-            [[ -z "${bmc_ip}" ]] && die "Node '${name}': missing bmc_ip"
+            [[ -z "${bmc_address}" ]] && die "Node '${name}': missing bmc_address"
             [[ -z "${bmc_user}" ]] && die "Node '${name}': missing bmc_user"
             [[ -z "${bmc_pass}" ]] && die "Node '${name}': missing bmc_pass"
-            [[ -z "${boot_mac}" ]] && die "Node '${name}': missing boot_mac"
 
             NODE_NAMES+=("${name}")
-            NODE_BMC_IPS+=("${bmc_ip}")
+            NODE_BMC_ADDRS+=("${bmc_address}")
             NODE_BMC_USERS+=("${bmc_user}")
             NODE_BMC_PASSES+=("${bmc_pass}")
             NODE_BOOT_MACS+=("${boot_mac}")
@@ -163,28 +162,53 @@ parse_inventory() {
 ##############################################################################
 
 discover_redfish_system_id() {
-    local bmc_ip="$1" bmc_user="$2" bmc_pass="$3"
+    local bmc_address="$1" bmc_user="$2" bmc_pass="$3"
 
     local systems_json
     systems_json=$(curl -sk --connect-timeout 5 --max-time 10 \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_ip}/redfish/v1/Systems/" 2>/dev/null) || return 1
+        "https://${bmc_address}/redfish/v1/Systems/" 2>/dev/null) || return 1
 
     echo "${systems_json}" | jq -r '.Members[0]."@odata.id"' 2>/dev/null
 }
 
+discover_boot_mac() {
+    local bmc_address="$1" bmc_user="$2" bmc_pass="$3" system_id="$4"
+
+    local ifaces_json mac
+    ifaces_json=$(curl -sk --connect-timeout 5 --max-time 15 \
+        -u "${bmc_user}:${bmc_pass}" \
+        "https://${bmc_address}/${system_id}EthernetInterfaces/" 2>/dev/null) || return 1
+
+    local iface_paths
+    iface_paths=$(echo "${ifaces_json}" | jq -r '.Members[]."@odata.id"' 2>/dev/null) || return 1
+
+    for iface_path in ${iface_paths}; do
+        mac=$(curl -sk --connect-timeout 5 --max-time 10 \
+            -u "${bmc_user}:${bmc_pass}" \
+            "https://${bmc_address}${iface_path}" 2>/dev/null \
+            | jq -r 'select(.Status.State == "Enabled") | .MACAddress // empty' 2>/dev/null)
+
+        if [[ -n "${mac}" && "${mac}" != "00:00:00:00:00:00" ]]; then
+            echo "${mac}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 verify_bmc() {
-    local name="$1" bmc_ip="$2" bmc_user="$3" bmc_pass="$4"
+    local name="$1" bmc_address="$2" bmc_user="$3" bmc_pass="$4"
     local rc=0
 
-    printf "  %-12s %-20s " "${name}" "${bmc_ip}"
+    printf "  %-12s %-20s " "${name}" "${bmc_address}"
 
     # Verify Redfish root is reachable and credentials work
     local http_code
     http_code=$(curl -sk --connect-timeout 5 --max-time 10 \
         -o /dev/null -w '%{http_code}' \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_ip}/redfish/v1/" 2>/dev/null) || http_code="000"
+        "https://${bmc_address}/redfish/v1/" 2>/dev/null) || http_code="000"
 
     if [[ "${http_code}" == "200" ]]; then
         echo "OK (HTTP ${http_code})"
@@ -208,7 +232,7 @@ verify_all_bmcs() {
 
     local failed=0
     for ((i = 0; i < ${#NODE_NAMES[@]}; i++)); do
-        if ! verify_bmc "${NODE_NAMES[$i]}" "${NODE_BMC_IPS[$i]}" \
+        if ! verify_bmc "${NODE_NAMES[$i]}" "${NODE_BMC_ADDRS[$i]}" \
                 "${NODE_BMC_USERS[$i]}" "${NODE_BMC_PASSES[$i]}"; then
             failed=$((failed + 1))
         fi
@@ -235,17 +259,29 @@ generate_ironic_nodes_json() {
 
     for ((i = 0; i < ${#NODE_NAMES[@]}; i++)); do
         local name="${NODE_NAMES[$i]}"
-        local bmc_ip="${NODE_BMC_IPS[$i]}"
+        local bmc_address="${NODE_BMC_ADDRS[$i]}"
         local bmc_user="${NODE_BMC_USERS[$i]}"
         local bmc_pass="${NODE_BMC_PASSES[$i]}"
         local boot_mac="${NODE_BOOT_MACS[$i]}"
 
         # Discover the Redfish system path from the BMC, fall back to standard
         local system_id
-        system_id=$(discover_redfish_system_id "${bmc_ip}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
+        system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
         system_id="${system_id:-/redfish/v1/Systems/1}"
         # Strip leading slash for URL construction
         system_id="${system_id#/}"
+
+        # Auto-discover boot MAC via Redfish if not provided
+        if [[ -z "${boot_mac}" ]]; then
+            info "  ${name}: boot_mac not set, attempting Redfish discovery..."
+            boot_mac=$(discover_boot_mac "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${system_id}" 2>/dev/null) || true
+            if [[ -n "${boot_mac}" ]]; then
+                info "  ${name}: discovered boot MAC ${boot_mac}"
+            else
+                echo "  WARNING: ${name}: could not discover boot MAC — set boot_mac in inventory" >&2
+                boot_mac="DISCOVERY_FAILED"
+            fi
+        fi
 
         ${first} || nodes_json+=","
         first=false
@@ -255,7 +291,7 @@ generate_ironic_nodes_json() {
     "name": "${name}",
     "driver": "redfish",
     "driver_info": {
-      "address": "redfish://${bmc_ip}/${system_id}",
+      "address": "redfish://${bmc_address}/${system_id}",
       "username": "${bmc_user}",
       "password": "${bmc_pass}",
       "redfish_verify_ca": "${BMC_VERIFY_CA}"

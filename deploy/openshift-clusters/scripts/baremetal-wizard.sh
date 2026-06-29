@@ -165,10 +165,10 @@ prompt_bmc_pass() {
 prompt_boot_mac() {
     local mac
     while true; do
-        read -rp "  Boot MAC address: " mac
+        read -rp "  Boot MAC address (Enter to auto-discover): " mac
         if [[ -z "${mac}" ]]; then
-            echo "  Error: boot MAC is required" >&2
-            continue
+            echo "${mac}"
+            return
         fi
         if ! valid_mac "${mac}"; then
             echo "  Error: invalid MAC (expected XX:XX:XX:XX:XX:XX)" >&2
@@ -195,13 +195,14 @@ show_summary() {
 
     local i
     for ((i = 0; i < ${#WIZ_NAMES[@]}; i++)); do
+        local display_mac="${WIZ_MACS[$i]:-auto-discover}"
         printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
             "$((i + 1))" \
             "${WIZ_NAMES[$i]}" \
             "${WIZ_IPS[$i]}" \
             "${WIZ_USERS[$i]}" \
             "********" \
-            "${WIZ_MACS[$i]}"
+            "${display_mac}"
     done
 
     echo "=================================="
@@ -279,7 +280,11 @@ write_inventory() {
 
     local i
     for ((i = 0; i < ${#WIZ_NAMES[@]}; i++)); do
-        echo "${WIZ_NAMES[$i]} bmc_ip=${WIZ_IPS[$i]} bmc_user=${WIZ_USERS[$i]} bmc_pass=${WIZ_PASSES[$i]} boot_mac=${WIZ_MACS[$i]}" >> "${tmp_inventory}"
+        local line="${WIZ_NAMES[$i]} bmc_address=${WIZ_IPS[$i]} bmc_user=${WIZ_USERS[$i]} bmc_pass=${WIZ_PASSES[$i]}"
+        if [[ -n "${WIZ_MACS[$i]}" ]]; then
+            line+=" boot_mac=${WIZ_MACS[$i]}"
+        fi
+        echo "${line}" >> "${tmp_inventory}"
     done
 
     {
