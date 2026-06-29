@@ -6,10 +6,10 @@
 #   inventory_baremetal.ini → baremetal nodes (BMC endpoints for adoption)
 #
 # Copy this file to inventory_baremetal.ini and fill in your node details.
-# Then run: make adopt-baremetal
+# Then run: make baremetal-adopt
 #
 # Each node requires:
-#   bmc_ip    - BMC/iDRAC/iLO management IP address
+#   bmc_ip    - BMC/iDRAC/iLO management address (IP or hostname)
 #   bmc_user  - BMC login username
 #   bmc_pass  - BMC login password
 #   boot_mac  - MAC address of the NIC used for PXE boot

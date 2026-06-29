@@ -79,6 +79,11 @@ valid_hostname() {
     [[ -n "${name}" ]] && [[ "${name}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]
 }
 
+valid_bmc_address() {
+    local addr="$1"
+    valid_ipv4 "${addr}" || valid_hostname "${addr}"
+}
+
 ##############################################################################
 # Prompt functions
 #
@@ -119,19 +124,19 @@ prompt_hostname() {
     done
 }
 
-prompt_bmc_ip() {
-    local ip
+prompt_bmc_address() {
+    local addr
     while true; do
-        read -rp "  BMC IP address: " ip
-        if [[ -z "${ip}" ]]; then
-            echo "  Error: BMC IP is required" >&2
+        read -rp "  BMC address (IP or hostname): " addr
+        if [[ -z "${addr}" ]]; then
+            echo "  Error: BMC address is required" >&2
             continue
         fi
-        if ! valid_ipv4 "${ip}"; then
-            echo "  Error: invalid IPv4 address (expected N.N.N.N)" >&2
+        if ! valid_bmc_address "${addr}"; then
+            echo "  Error: invalid address (expected IPv4 or FQDN)" >&2
             continue
         fi
-        echo "${ip}"
+        echo "${addr}"
         return
     done
 }
@@ -183,14 +188,14 @@ show_summary() {
     echo "=================================="
     echo "  BAREMETAL NODE SUMMARY"
     echo "=================================="
-    printf "  %-4s %-14s %-17s %-10s %-10s %-19s\n" \
-        "#" "HOSTNAME" "BMC IP" "BMC USER" "PASSWORD" "BOOT MAC"
-    printf "  %-4s %-14s %-17s %-10s %-10s %-19s\n" \
-        "---" "------------" "---------------" "--------" "--------" "-----------------"
+    printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
+        "#" "HOSTNAME" "BMC ADDRESS" "BMC USER" "PASSWORD" "BOOT MAC"
+    printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
+        "---" "------------" "--------------------------------------" "--------" "--------" "-----------------"
 
     local i
     for ((i = 0; i < ${#WIZ_NAMES[@]}; i++)); do
-        printf "  %-4s %-14s %-17s %-10s %-10s %-19s\n" \
+        printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
             "$((i + 1))" \
             "${WIZ_NAMES[$i]}" \
             "${WIZ_IPS[$i]}" \
@@ -227,7 +232,7 @@ run_wizard() {
             echo "--- Node $((i + 1)) of ${node_count} ---"
 
             WIZ_NAMES+=("$(prompt_hostname "${default_name}")")
-            WIZ_IPS+=("$(prompt_bmc_ip)")
+            WIZ_IPS+=("$(prompt_bmc_address)")
             WIZ_USERS+=("$(prompt_bmc_user)")
             WIZ_PASSES+=("$(prompt_bmc_pass)")
             WIZ_MACS+=("$(prompt_boot_mac)")
