@@ -1,4 +1,8 @@
 inventory.ini
+inventory_baremetal.ini
+
+# Generated adoption artifacts (contain BMC credentials)
+clusters/
 proxy.env
 kubeconfig
 kubeadmin-password

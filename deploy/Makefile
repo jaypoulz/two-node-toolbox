@@ -92,6 +92,12 @@ fencing-assisted:
 keep-instance:
 	@../helpers/keep-instance.sh '$(DAYS)'
 
+adopt-baremetal:
+	@./openshift-clusters/scripts/adopt-baremetal.sh
+
+verify-baremetal:
+	@./openshift-clusters/scripts/adopt-baremetal.sh --verify-only
+
 patch-nodes:
 	@./openshift-clusters/scripts/patch-nodes.sh
 get-tnf-logs:
@@ -137,6 +143,10 @@ help:
 	@echo "  full-clean           - Fully clean instance cache and OpenShift cluster using dev-scripts realclean target"
 	@echo "  clean-spoke          - Clean spoke cluster resources (VMs, network, auth) from assisted installer"
 	@echo "  patch-nodes          - Build resource-agents RPM and patch cluster nodes (default version: 4.11)"
+	@echo ""
+	@echo "Baremetal Adoption:"
+	@echo "  adopt-baremetal      - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
+	@echo "  verify-baremetal     - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
 	@echo ""
 	@echo "Cluster Utilities:"
 	@echo "  get-tnf-logs         - Collect pacemaker and etcd logs from cluster nodes"

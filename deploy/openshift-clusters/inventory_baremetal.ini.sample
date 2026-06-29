@@ -1,0 +1,32 @@
+# Baremetal node inventory for TNF adoption
+#
+# NOTE: This is separate from inventory.ini, which targets the hypervisor host.
+# This file describes the physical baremetal nodes to be adopted as OpenShift nodes.
+#   inventory.ini           → hypervisor (where dev-scripts runs)
+#   inventory_baremetal.ini → baremetal nodes (BMC endpoints for adoption)
+#
+# Copy this file to inventory_baremetal.ini and fill in your node details.
+# Then run: make adopt-baremetal
+#
+# Each node requires:
+#   bmc_ip    - BMC/iDRAC/iLO management IP address
+#   bmc_user  - BMC login username
+#   bmc_pass  - BMC login password
+#   boot_mac  - MAC address of the NIC used for PXE boot
+#
+# The hostname (first field) becomes the node name in ironic_nodes.json.
+# For TNF, you need exactly 2 nodes (master-0 and master-1).
+
+[baremetal_nodes]
+master-0 bmc_ip=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01
+master-1 bmc_ip=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02
+
+[baremetal_nodes:vars]
+# BMC driver — only redfish is supported for TNF fencing
+bmc_driver=redfish
+
+# Skip TLS verification for BMC endpoints (common with self-signed certs)
+bmc_verify_ca=False
+
+# Node CPU architecture
+cpu_arch=x86_64
