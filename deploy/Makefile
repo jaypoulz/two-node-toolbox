@@ -83,6 +83,9 @@ fencing-assisted:
 	@$(MAKE) fencing-ipi
 	@./openshift-clusters/scripts/deploy-fencing-assisted.sh
 
+keep-instance:
+	@../helpers/keep-instance.sh '$(DAYS)'
+
 patch-nodes:
 	@./openshift-clusters/scripts/patch-nodes.sh
 get-tnf-logs:
@@ -105,7 +108,9 @@ help:
 	@echo "Instance Utils:"
 	@echo "  ssh                  - SSH into the EC2 instance"
 	@echo "  info                 - Display instance information"
-	@echo "  inventory            - Update inventory.ini with current instance IP" 
+	@echo "  inventory            - Update inventory.ini with current instance IP"
+	@echo "  keep-instance        - Tag instance with keep-N retention (default: 2, max: 5)"
+	@echo "                         Usage: make keep-instance or make keep-instance DAYS=5"
 	@echo ""
 	@echo "OpenShift Cluster Deployment:"
 	@echo "  fencing-ipi          - Deploy fencing IPI cluster (non-interactive)"
