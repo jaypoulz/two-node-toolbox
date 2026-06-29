@@ -10,7 +10,7 @@
 #
 # Options:
 #   --cluster-name NAME   Cluster name for output directory (default: ostest)
-#   --skip-verify         Skip BMC credential verification
+#   --skip-verify         Skip all BMC access (verify + discovery); requires boot_mac in inventory
 #   --verify-only         Only verify BMC credentials, don't generate artifacts
 #   --inventory FILE       Path to baremetal inventory (default: inventory_baremetal.ini)
 #   --config-base FILE    Base config to derive baremetal config from
@@ -292,8 +292,8 @@ generate_ironic_nodes_json() {
 
     info "Generating ironic_nodes.json"
 
-    local nodes_json='{"nodes":['
-    local first=true
+    local incomplete=false
+    local nodes=()
 
     for ((i = 0; i < ${#NODE_NAMES[@]}; i++)); do
         local name="${NODE_NAMES[$i]}"
@@ -302,52 +302,61 @@ generate_ironic_nodes_json() {
         local bmc_pass="${NODE_BMC_PASSES[$i]}"
         local boot_mac="${NODE_BOOT_MACS[$i]}"
 
-        # Discover the Redfish system path from the BMC, fall back to standard
+        # Discover Redfish system path (requires BMC access)
         local system_id
-        system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
-        system_id="${system_id:-/redfish/v1/Systems/1}"
-        # Strip leading slash for URL construction
-        system_id="${system_id#/}"
+        if ${SKIP_VERIFY}; then
+            system_id="redfish/v1/Systems/1"
+        else
+            system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
+            system_id="${system_id:-/redfish/v1/Systems/1}"
+            system_id="${system_id#/}"
+        fi
 
         # Auto-discover boot MAC via Redfish if not provided
         if [[ -z "${boot_mac}" ]]; then
+            if ${SKIP_VERIFY}; then
+                echo "  ERROR: ${name}: boot_mac required when using --skip-verify" >&2
+                incomplete=true
+                continue
+            fi
             info "  ${name}: boot_mac not set, attempting Redfish discovery..."
             boot_mac=$(discover_boot_mac "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${system_id}" 2>/dev/null) || true
             if [[ -n "${boot_mac}" ]]; then
                 info "  ${name}: discovered boot MAC ${boot_mac}"
             else
-                echo "  WARNING: ${name}: could not discover boot MAC — set boot_mac in inventory" >&2
-                boot_mac="DISCOVERY_FAILED"
+                echo "  ERROR: ${name}: could not discover boot MAC — set boot_mac in inventory" >&2
+                incomplete=true
+                continue
             fi
         fi
 
-        ${first} || nodes_json+=","
-        first=false
-
-        nodes_json+=$(cat <<NODEJSON
-{
-    "name": "${name}",
-    "driver": "redfish",
-    "driver_info": {
-      "address": "redfish://${bmc_address}/${system_id}",
-      "username": "${bmc_user}",
-      "password": "${bmc_pass}",
-      "redfish_verify_ca": "${BMC_VERIFY_CA}"
-    },
-    "ports": [
-      {"address": "${boot_mac}"}
-    ],
-    "properties": {
-      "cpu_arch": "${CPU_ARCH}"
-    }
-  }
-NODEJSON
-        )
+        nodes+=("$(jq -n \
+            --arg name "${name}" \
+            --arg addr "redfish://${bmc_address}/${system_id}" \
+            --arg user "${bmc_user}" \
+            --arg pass "${bmc_pass}" \
+            --arg verify_ca "${BMC_VERIFY_CA}" \
+            --arg mac "${boot_mac}" \
+            --arg arch "${CPU_ARCH}" \
+            '{
+                name: $name,
+                driver: "redfish",
+                driver_info: {
+                    address: $addr,
+                    username: $user,
+                    password: $pass,
+                    redfish_verify_ca: $verify_ca
+                },
+                ports: [{address: $mac}],
+                properties: {cpu_arch: $arch}
+            }')")
     done
 
-    nodes_json+=']}'
+    if ${incomplete}; then
+        die "Incomplete artifacts — set missing boot_mac values in inventory"
+    fi
 
-    echo "${nodes_json}" | jq . > "${output_file}"
+    printf '%s\n' "${nodes[@]}" | jq -s '{nodes: .}' > "${output_file}"
     info "  → ${output_file}"
 }
 
