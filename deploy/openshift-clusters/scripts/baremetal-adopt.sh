@@ -310,6 +310,7 @@ generate_ironic_nodes_json() {
             system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
             system_id="${system_id:-/redfish/v1/Systems/1}"
             system_id="${system_id#/}"
+            system_id="${system_id%/}"
         fi
 
         # Auto-discover boot MAC via Redfish if not provided
