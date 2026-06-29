@@ -175,22 +175,46 @@ discover_redfish_system_id() {
 discover_boot_mac() {
     local bmc_address="$1" bmc_user="$2" bmc_pass="$3" system_id="$4"
 
-    local ifaces_json mac
-    ifaces_json=$(curl -sk --connect-timeout 5 --max-time 15 \
+    # Get boot order from the system resource
+    local boot_order
+    boot_order=$(curl -sk --connect-timeout 5 --max-time 10 \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_address}/${system_id}EthernetInterfaces/" 2>/dev/null) || return 1
+        "https://${bmc_address}/${system_id}" 2>/dev/null \
+        | jq -r '.Boot.BootOrder[]' 2>/dev/null) || return 1
 
-    local iface_paths
-    iface_paths=$(echo "${ifaces_json}" | jq -r '.Members[]."@odata.id"' 2>/dev/null) || return 1
+    # Fetch all boot options and index by BootOptionReference
+    local options_json
+    options_json=$(curl -sk --connect-timeout 5 --max-time 10 \
+        -u "${bmc_user}:${bmc_pass}" \
+        "https://${bmc_address}/${system_id}BootOptions/" 2>/dev/null) || return 1
 
-    for iface_path in ${iface_paths}; do
-        mac=$(curl -sk --connect-timeout 5 --max-time 10 \
+    local option_paths
+    option_paths=$(echo "${options_json}" | jq -r '.Members[]."@odata.id"' 2>/dev/null) || return 1
+
+    # Build associative arrays: ref → display_name, ref → uefi_path
+    declare -A opt_display opt_path
+    for option_url in ${option_paths}; do
+        local option
+        option=$(curl -sk --connect-timeout 5 --max-time 10 \
             -u "${bmc_user}:${bmc_pass}" \
-            "https://${bmc_address}${iface_path}" 2>/dev/null \
-            | jq -r 'select(.Status.State == "Enabled") | .MACAddress // empty' 2>/dev/null)
+            "https://${bmc_address}${option_url}" 2>/dev/null) || continue
 
-        if [[ -n "${mac}" && "${mac}" != "00:00:00:00:00:00" ]]; then
-            echo "${mac}"
+        local ref
+        ref=$(echo "${option}" | jq -r '.BootOptionReference // empty' 2>/dev/null)
+        [[ -z "${ref}" ]] && continue
+        opt_display["${ref}"]=$(echo "${option}" | jq -r '.DisplayName // empty' 2>/dev/null)
+        opt_path["${ref}"]=$(echo "${option}" | jq -r '.UefiDevicePath // empty' 2>/dev/null)
+    done
+
+    # Walk boot order, find the first PXE IPv4 entry
+    for boot_ref in ${boot_order}; do
+        local display_name="${opt_display[${boot_ref}]:-}"
+        local uefi_path="${opt_path[${boot_ref}]:-}"
+
+        if [[ "${display_name}" == *"PXE IPv4"* ]] && [[ "${uefi_path}" == *MAC* ]]; then
+            local raw_mac
+            raw_mac=$(echo "${uefi_path}" | grep -oP 'MAC\(\K[0-9A-Fa-f]+' 2>/dev/null) || continue
+            echo "${raw_mac}" | sed 's/\(..\)/\1:/g; s/:$//' | tr '[:lower:]' '[:upper:]'
             return 0
         fi
     done
