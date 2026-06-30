@@ -36,3 +36,6 @@ export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 #     export VBMC_IMAGE=quay.io/rh-edge-enablement/vbmc:2026-06
 #     export SUSHY_TOOLS_IMAGE=quay.io/rh-edge-enablement/sushy-tools:2026-06
 # fi
+
+# Baremetal network config (node IPs, VIPs, bridge overrides) is auto-generated
+# by 'make baremetal-adopt' into config_baremetal_fencing.sh — do not add here.

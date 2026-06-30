@@ -84,6 +84,17 @@ valid_bmc_address() {
     valid_ipv4 "${addr}" || valid_hostname "${addr}"
 }
 
+valid_cidr() {
+    local cidr="$1"
+    local ip="${cidr%%/*}"
+    local prefix="${cidr##*/}"
+    [[ "${cidr}" == *"/"* ]] || return 1
+    valid_ipv4 "${ip}" || return 1
+    [[ "${prefix}" =~ ^[0-9]+$ ]] || return 1
+    (( prefix <= 32 )) || return 1
+    return 0
+}
+
 ##############################################################################
 # Prompt functions
 #
@@ -179,6 +190,91 @@ prompt_boot_mac() {
     done
 }
 
+prompt_node_ip() {
+    local ip
+    while true; do
+        read -rp "  Node IP address (Enter to skip): " ip
+        if [[ -z "${ip}" ]]; then
+            echo "${ip}"
+            return
+        fi
+        if ! valid_ipv4 "${ip}"; then
+            echo "  Error: invalid IPv4 address" >&2
+            continue
+        fi
+        echo "${ip}"
+        return
+    done
+}
+
+prompt_machine_network() {
+    local cidr
+    while true; do
+        read -rp "  Machine network CIDR (e.g. 192.168.1.0/24, Enter to skip): " cidr
+        if [[ -z "${cidr}" ]]; then
+            echo "${cidr}"
+            return
+        fi
+        if ! valid_cidr "${cidr}"; then
+            echo "  Error: invalid CIDR (expected x.x.x.x/prefix)" >&2
+            continue
+        fi
+        echo "${cidr}"
+        return
+    done
+}
+
+prompt_gateway() {
+    local gw
+    while true; do
+        read -rp "  Gateway IP (Enter to skip): " gw
+        if [[ -z "${gw}" ]]; then
+            echo "${gw}"
+            return
+        fi
+        if ! valid_ipv4 "${gw}"; then
+            echo "  Error: invalid IPv4 address" >&2
+            continue
+        fi
+        echo "${gw}"
+        return
+    done
+}
+
+prompt_api_vip() {
+    local vip
+    while true; do
+        read -rp "  API VIP (Enter to skip): " vip
+        if [[ -z "${vip}" ]]; then
+            echo "${vip}"
+            return
+        fi
+        if ! valid_ipv4 "${vip}"; then
+            echo "  Error: invalid IPv4 address" >&2
+            continue
+        fi
+        echo "${vip}"
+        return
+    done
+}
+
+prompt_ingress_vip() {
+    local vip
+    while true; do
+        read -rp "  Ingress VIP (Enter to skip): " vip
+        if [[ -z "${vip}" ]]; then
+            echo "${vip}"
+            return
+        fi
+        if ! valid_ipv4 "${vip}"; then
+            echo "  Error: invalid IPv4 address" >&2
+            continue
+        fi
+        echo "${vip}"
+        return
+    done
+}
+
 ##############################################################################
 # Summary display
 ##############################################################################
@@ -188,22 +284,33 @@ show_summary() {
     echo "=================================="
     echo "  BAREMETAL NODE SUMMARY"
     echo "=================================="
-    printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
-        "#" "HOSTNAME" "BMC ADDRESS" "BMC USER" "PASSWORD" "BOOT MAC"
-    printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
-        "---" "------------" "--------------------------------------" "--------" "--------" "-----------------"
+    printf "  %-4s %-14s %-40s %-10s %-10s %-19s %-17s\n" \
+        "#" "HOSTNAME" "BMC ADDRESS" "BMC USER" "PASSWORD" "BOOT MAC" "NODE IP"
+    printf "  %-4s %-14s %-40s %-10s %-10s %-19s %-17s\n" \
+        "---" "------------" "--------------------------------------" "--------" "--------" "-----------------" "---------------"
 
     local i
     for ((i = 0; i < ${#WIZ_NAMES[@]}; i++)); do
         local display_mac="${WIZ_MACS[$i]:-auto-discover}"
-        printf "  %-4s %-14s %-40s %-10s %-10s %-19s\n" \
+        local display_ip="${WIZ_NODE_IPS[$i]:---}"
+        printf "  %-4s %-14s %-40s %-10s %-10s %-19s %-17s\n" \
             "$((i + 1))" \
             "${WIZ_NAMES[$i]}" \
             "${WIZ_IPS[$i]}" \
             "${WIZ_USERS[$i]}" \
             "********" \
-            "${display_mac}"
+            "${display_mac}" \
+            "${display_ip}"
     done
+
+    if [[ -n "${WIZ_MACHINE_NETWORK}" || -n "${WIZ_GATEWAY}" || -n "${WIZ_API_VIP}" || -n "${WIZ_INGRESS_VIP}" ]]; then
+        echo ""
+        echo "  Cluster Network:"
+        [[ -n "${WIZ_MACHINE_NETWORK}" ]] && echo "    Machine network: ${WIZ_MACHINE_NETWORK}"
+        [[ -n "${WIZ_GATEWAY}" ]] && echo "    Gateway:         ${WIZ_GATEWAY}"
+        [[ -n "${WIZ_API_VIP}" ]] && echo "    API VIP:         ${WIZ_API_VIP}"
+        [[ -n "${WIZ_INGRESS_VIP}" ]] && echo "    Ingress VIP:     ${WIZ_INGRESS_VIP}"
+    fi
 
     echo "=================================="
 }
@@ -225,6 +332,7 @@ run_wizard() {
         WIZ_USERS=()
         WIZ_PASSES=()
         WIZ_MACS=()
+        WIZ_NODE_IPS=()
 
         local i
         for ((i = 0; i < node_count; i++)); do
@@ -237,7 +345,15 @@ run_wizard() {
             WIZ_USERS+=("$(prompt_bmc_user)")
             WIZ_PASSES+=("$(prompt_bmc_pass)")
             WIZ_MACS+=("$(prompt_boot_mac)")
+            WIZ_NODE_IPS+=("$(prompt_node_ip)")
         done
+
+        echo ""
+        echo "--- Cluster Network (all optional) ---"
+        WIZ_MACHINE_NETWORK="$(prompt_machine_network)"
+        WIZ_GATEWAY="$(prompt_gateway)"
+        WIZ_API_VIP="$(prompt_api_vip)"
+        WIZ_INGRESS_VIP="$(prompt_ingress_vip)"
 
         show_summary
 
@@ -284,6 +400,11 @@ write_inventory() {
         if [[ -n "${WIZ_MACS[$i]}" ]]; then
             line+=" boot_mac=${WIZ_MACS[$i]}"
         fi
+        if [[ -n "${WIZ_NODE_IPS[$i]}" ]]; then
+            line+=" node_ip=${WIZ_NODE_IPS[$i]}"
+        else
+            line+=" #node_ip="
+        fi
         echo "${line}" >> "${tmp_inventory}"
     done
 
@@ -293,6 +414,31 @@ write_inventory() {
         echo "bmc_driver=redfish"
         echo "bmc_verify_ca=False"
         echo "cpu_arch=x86_64"
+    } >> "${tmp_inventory}"
+
+    {
+        echo ""
+        echo "[baremetal_network]"
+        if [[ -n "${WIZ_MACHINE_NETWORK}" ]]; then
+            echo "machine_network=${WIZ_MACHINE_NETWORK}"
+        else
+            echo "#machine_network="
+        fi
+        if [[ -n "${WIZ_GATEWAY}" ]]; then
+            echo "gateway=${WIZ_GATEWAY}"
+        else
+            echo "#gateway="
+        fi
+        if [[ -n "${WIZ_API_VIP}" ]]; then
+            echo "api_vip=${WIZ_API_VIP}"
+        else
+            echo "#api_vip="
+        fi
+        if [[ -n "${WIZ_INGRESS_VIP}" ]]; then
+            echo "ingress_vip=${WIZ_INGRESS_VIP}"
+        else
+            echo "#ingress_vip="
+        fi
     } >> "${tmp_inventory}"
 
     mv "${tmp_inventory}" "${OUTPUT}"
@@ -309,6 +455,11 @@ declare -a WIZ_IPS=()
 declare -a WIZ_USERS=()
 declare -a WIZ_PASSES=()
 declare -a WIZ_MACS=()
+declare -a WIZ_NODE_IPS=()
+WIZ_MACHINE_NETWORK=""
+WIZ_GATEWAY=""
+WIZ_API_VIP=""
+WIZ_INGRESS_VIP=""
 
 parse_args "$@"
 run_wizard
