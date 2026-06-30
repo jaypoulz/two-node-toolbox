@@ -275,6 +275,41 @@ prompt_ingress_vip() {
     done
 }
 
+prompt_ssh_target() {
+    local target
+    while true; do
+        read -rp "  SSH target for remote deployment (user@host, Enter to skip): " target
+        if [[ -z "${target}" ]]; then
+            echo "${target}"
+            return
+        fi
+        if ! [[ "${target}" == *@* ]]; then
+            echo "  Error: expected user@host format" >&2
+            continue
+        fi
+        echo "${target}"
+        return
+    done
+}
+
+prompt_ssh_key() {
+    local key
+    read -rp "  SSH key path (Enter for ssh-agent/default): " key
+    echo "${key}"
+}
+
+prompt_dev_scripts_path() {
+    local path
+    read -rp "  dev-scripts path on remote [~/openshift-metal3/dev-scripts]: " path
+    echo "${path}"
+}
+
+prompt_working_dir() {
+    local dir
+    read -rp "  Remote working directory [~/tnt-baremetal]: " dir
+    echo "${dir}"
+}
+
 ##############################################################################
 # Summary display
 ##############################################################################
@@ -310,6 +345,15 @@ show_summary() {
         [[ -n "${WIZ_GATEWAY}" ]] && echo "    Gateway:         ${WIZ_GATEWAY}"
         [[ -n "${WIZ_API_VIP}" ]] && echo "    API VIP:         ${WIZ_API_VIP}"
         [[ -n "${WIZ_INGRESS_VIP}" ]] && echo "    Ingress VIP:     ${WIZ_INGRESS_VIP}"
+    fi
+
+    if [[ -n "${WIZ_SSH_TARGET}" ]]; then
+        echo ""
+        echo "  Provisioning Host:"
+        echo "    SSH target:      ${WIZ_SSH_TARGET}"
+        echo "    SSH key:         ${WIZ_SSH_KEY:---}"
+        echo "    Dev-scripts:     ${WIZ_DEV_SCRIPTS_PATH:-~/openshift-metal3/dev-scripts}"
+        echo "    Working dir:     ${WIZ_WORKING_DIR:-~/tnt-baremetal}"
     fi
 
     echo "=================================="
@@ -354,6 +398,19 @@ run_wizard() {
         WIZ_GATEWAY="$(prompt_gateway)"
         WIZ_API_VIP="$(prompt_api_vip)"
         WIZ_INGRESS_VIP="$(prompt_ingress_vip)"
+
+        echo ""
+        echo "--- Provisioning Host (optional) ---"
+        WIZ_SSH_TARGET="$(prompt_ssh_target)"
+        if [[ -n "${WIZ_SSH_TARGET}" ]]; then
+            WIZ_SSH_KEY="$(prompt_ssh_key)"
+            WIZ_DEV_SCRIPTS_PATH="$(prompt_dev_scripts_path)"
+            WIZ_WORKING_DIR="$(prompt_working_dir)"
+        else
+            WIZ_SSH_KEY=""
+            WIZ_DEV_SCRIPTS_PATH=""
+            WIZ_WORKING_DIR=""
+        fi
 
         show_summary
 
@@ -441,6 +498,31 @@ write_inventory() {
         fi
     } >> "${tmp_inventory}"
 
+    {
+        echo ""
+        echo "[provisioning_host]"
+        if [[ -n "${WIZ_SSH_TARGET}" ]]; then
+            echo "ssh_target=${WIZ_SSH_TARGET}"
+        else
+            echo "#ssh_target="
+        fi
+        if [[ -n "${WIZ_SSH_KEY}" ]]; then
+            echo "ssh_key=${WIZ_SSH_KEY}"
+        else
+            echo "#ssh_key="
+        fi
+        if [[ -n "${WIZ_DEV_SCRIPTS_PATH}" ]]; then
+            echo "dev_scripts_path=${WIZ_DEV_SCRIPTS_PATH}"
+        else
+            echo "#dev_scripts_path="
+        fi
+        if [[ -n "${WIZ_WORKING_DIR}" ]]; then
+            echo "working_dir=${WIZ_WORKING_DIR}"
+        else
+            echo "#working_dir="
+        fi
+    } >> "${tmp_inventory}"
+
     mv "${tmp_inventory}" "${OUTPUT}"
     echo ""
     info "Inventory written to ${OUTPUT}"
@@ -460,6 +542,10 @@ WIZ_MACHINE_NETWORK=""
 WIZ_GATEWAY=""
 WIZ_API_VIP=""
 WIZ_INGRESS_VIP=""
+WIZ_SSH_TARGET=""
+WIZ_SSH_KEY=""
+WIZ_DEV_SCRIPTS_PATH=""
+WIZ_WORKING_DIR=""
 
 parse_args "$@"
 run_wizard
