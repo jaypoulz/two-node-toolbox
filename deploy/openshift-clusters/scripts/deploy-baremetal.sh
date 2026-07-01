@@ -10,9 +10,11 @@
 #   deploy-baremetal.sh [options]
 #
 # Options:
-#   --cluster-name NAME       Cluster name matching adoption artifacts (default: ostest)
-#   --dev-scripts-path PATH   Path to dev-scripts checkout (default: ~/openshift-metal3/dev-scripts)
-#   -h, --help                Show this help message
+#   --cluster-name NAME         Cluster name matching adoption artifacts (default: ostest)
+#   --dev-scripts-path PATH     Path to dev-scripts checkout (default: ~/openshift-metal3/dev-scripts)
+#   --dev-scripts-repo URL      Git repo for dev-scripts (default: upstream openshift-metal3)
+#   --dev-scripts-branch BRANCH Git branch to checkout (default: repo's current branch)
+#   -h, --help                  Show this help message
 
 set -o nounset
 set -o errexit
@@ -23,7 +25,8 @@ OC_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 CLUSTER_NAME="${CLUSTER_NAME:-ostest}"
 DEV_SCRIPTS_PATH="${DEV_SCRIPTS_PATH:-${HOME}/openshift-metal3/dev-scripts}"
-DEV_SCRIPTS_REPO="https://github.com/openshift-metal3/dev-scripts"
+DEV_SCRIPTS_REPO="${DEV_SCRIPTS_REPO:-https://github.com/openshift-metal3/dev-scripts}"
+DEV_SCRIPTS_BRANCH="${DEV_SCRIPTS_BRANCH:-}"
 
 ##############################################################################
 # Helpers
@@ -50,6 +53,14 @@ parse_args() {
                 DEV_SCRIPTS_PATH="$2"
                 shift 2
                 ;;
+            --dev-scripts-repo)
+                DEV_SCRIPTS_REPO="$2"
+                shift 2
+                ;;
+            --dev-scripts-branch)
+                DEV_SCRIPTS_BRANCH="$2"
+                shift 2
+                ;;
             -h|--help)
                 head -15 "$0" | tail -10
                 exit 0
@@ -64,44 +75,6 @@ parse_args() {
 ##############################################################################
 # Pre-flight validation
 ##############################################################################
-
-REQUIRED_TOOLS=(podman oc jq curl dnsmasq firewall-cmd xmllint ansible-playbook go)
-
-validate_tools() {
-    local missing=()
-    for tool in "${REQUIRED_TOOLS[@]}"; do
-        if ! command -v "${tool}" &>/dev/null; then
-            missing+=("${tool}")
-        fi
-    done
-
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        echo ""
-        echo "Missing required tools: ${missing[*]}"
-        echo ""
-        echo "Install with:"
-        echo "  sudo dnf install -y podman jq curl dnsmasq firewalld libxml2 ansible-core golang"
-        echo ""
-        echo "Then install oc:"
-        echo "  Download from https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/"
-        die "Install missing tools and re-run."
-    fi
-    info "Required tools present"
-
-    # Ansible collections required by dev-scripts agent manifests
-    local collections_needed=0
-    for col in ansible.utils ansible.netcommon ansible.posix community.general; do
-        if ! ansible-galaxy collection list 2>/dev/null | grep -q "${col}"; then
-            collections_needed=1
-            break
-        fi
-    done
-
-    if [[ ${collections_needed} -eq 1 ]]; then
-        info "Installing required Ansible collections..."
-        ansible-galaxy collection install 'ansible.netcommon<8.0.0' ansible.posix 'ansible.utils<6.0.0' community.general
-    fi
-}
 
 validate_sudo() {
     if ! sudo -n true 2>/dev/null; then
@@ -189,10 +162,23 @@ validate_config() {
 
 setup_dev_scripts() {
     if [[ ! -d "${DEV_SCRIPTS_PATH}" ]]; then
-        info "Dev-scripts not found at ${DEV_SCRIPTS_PATH}, cloning..."
-        git clone "${DEV_SCRIPTS_REPO}" "${DEV_SCRIPTS_PATH}"
+        info "Cloning dev-scripts from ${DEV_SCRIPTS_REPO}${DEV_SCRIPTS_BRANCH:+ (branch: ${DEV_SCRIPTS_BRANCH})}..."
+        local clone_args=("${DEV_SCRIPTS_REPO}" "${DEV_SCRIPTS_PATH}")
+        if [[ -n "${DEV_SCRIPTS_BRANCH}" ]]; then
+            clone_args=(-b "${DEV_SCRIPTS_BRANCH}" "${clone_args[@]}")
+        fi
+        git clone "${clone_args[@]}"
     else
         info "Using dev-scripts at ${DEV_SCRIPTS_PATH}"
+        if [[ -n "${DEV_SCRIPTS_BRANCH}" ]]; then
+            local current_branch
+            current_branch=$(git -C "${DEV_SCRIPTS_PATH}" rev-parse --abbrev-ref HEAD)
+            if [[ "${current_branch}" != "${DEV_SCRIPTS_BRANCH}" ]]; then
+                info "Switching dev-scripts from ${current_branch} to ${DEV_SCRIPTS_BRANCH}..."
+                git -C "${DEV_SCRIPTS_PATH}" fetch --all --quiet
+                git -C "${DEV_SCRIPTS_PATH}" checkout "${DEV_SCRIPTS_BRANCH}"
+            fi
+        fi
     fi
 
     [[ -f "${DEV_SCRIPTS_PATH}/Makefile" ]] || \
@@ -224,21 +210,6 @@ setup_dev_scripts() {
             die "Cannot determine DNS server for nodes. Set BAREMETAL_DNS or BAREMETAL_GATEWAY in config."
         fi
         info "Setting PROVISIONING_HOST_EXTERNAL_IP=${dns_ip} (from BAREMETAL_DNS/BAREMETAL_GATEWAY)"
-    fi
-
-    # Ensure 'python' resolves — dev-scripts' nth_ip() calls bare 'python',
-    # and Fedora only ships 'python3'.
-    if ! command -v python &>/dev/null && command -v python3 &>/dev/null; then
-        local python_wrapper="${DEV_SCRIPTS_PATH}/.local-bin"
-        mkdir -p "${python_wrapper}"
-        ln -sf "$(command -v python3)" "${python_wrapper}/python"
-        export PATH="${python_wrapper}:${PATH}"
-    fi
-
-    # Ansible collections installed in user home need to be on PYTHONPATH
-    # for nth_ip() which calls python directly (not via ansible-playbook).
-    if [[ -d "${HOME}/.ansible/collections" ]]; then
-        export PYTHONPATH="${HOME}/.ansible/collections:${PYTHONPATH:-}"
     fi
 
     info "Deploying config to dev-scripts"
@@ -281,6 +252,8 @@ parse_provisioning_host() {
     PROV_SSH_TARGET=""
     PROV_SSH_KEY=""
     PROV_DEV_SCRIPTS_PATH=""
+    PROV_DEV_SCRIPTS_REPO=""
+    PROV_DEV_SCRIPTS_BRANCH=""
     PROV_WORKING_DIR="tnt-baremetal"
 
     [[ -f "${inventory}" ]] || return 0
@@ -306,8 +279,10 @@ parse_provisioning_host() {
             case "${key}" in
                 ssh_target)       PROV_SSH_TARGET="${val}" ;;
                 ssh_key)          PROV_SSH_KEY="${val}" ;;
-                dev_scripts_path) PROV_DEV_SCRIPTS_PATH="${val}" ;;
-                working_dir)      PROV_WORKING_DIR="${val}" ;;
+                dev_scripts_path)   PROV_DEV_SCRIPTS_PATH="${val}" ;;
+                dev_scripts_repo)   PROV_DEV_SCRIPTS_REPO="${val}" ;;
+                dev_scripts_branch) PROV_DEV_SCRIPTS_BRANCH="${val}" ;;
+                working_dir)        PROV_WORKING_DIR="${val}" ;;
             esac
         fi
     done < "${inventory}"
@@ -315,14 +290,18 @@ parse_provisioning_host() {
 
 build_ssh_opts() {
     SSH_OPTS=(-o "ServerAliveInterval=30" -o "ServerAliveCountMax=120")
-    [[ -n "${PROV_SSH_KEY:-}" ]] && SSH_OPTS+=(-i "${PROV_SSH_KEY}")
+    if [[ -n "${PROV_SSH_KEY:-}" ]]; then
+        SSH_OPTS+=(-i "${PROV_SSH_KEY}")
+    fi
 }
 
 validate_ssh_connectivity() {
     info "Validating SSH access to ${PROV_SSH_TARGET}..."
 
     local opts=(-o "ConnectTimeout=10" -o "BatchMode=yes")
-    [[ -n "${PROV_SSH_KEY:-}" ]] && opts+=(-i "${PROV_SSH_KEY}")
+    if [[ -n "${PROV_SSH_KEY:-}" ]]; then
+        opts+=(-i "${PROV_SSH_KEY}")
+    fi
 
     if ! ssh "${opts[@]}" "${PROV_SSH_TARGET}" "true" 2>/dev/null; then
         die "Cannot SSH to provisioning host: ${PROV_SSH_TARGET}
@@ -373,8 +352,15 @@ exec_on_remote() {
     # shellcheck disable=SC2088 # tilde expands on the remote shell via SSH
     local remote_script="~/${PROV_WORKING_DIR}/scripts/deploy-baremetal.sh"
     local remote_args="--cluster-name ${CLUSTER_NAME}"
-    [[ -n "${PROV_DEV_SCRIPTS_PATH:-}" ]] && \
+    if [[ -n "${PROV_DEV_SCRIPTS_PATH:-}" ]]; then
         remote_args+=" --dev-scripts-path ${PROV_DEV_SCRIPTS_PATH}"
+    fi
+    if [[ -n "${PROV_DEV_SCRIPTS_REPO:-}" ]]; then
+        remote_args+=" --dev-scripts-repo ${PROV_DEV_SCRIPTS_REPO}"
+    fi
+    if [[ -n "${PROV_DEV_SCRIPTS_BRANCH:-}" ]]; then
+        remote_args+=" --dev-scripts-branch ${PROV_DEV_SCRIPTS_BRANCH}"
+    fi
 
     info "Executing deploy on ${PROV_SSH_TARGET}..."
     info "Remote output follows:"
@@ -443,7 +429,6 @@ main() {
     info "Baremetal TNF deployment — cluster: ${CLUSTER_NAME}"
     echo ""
 
-    validate_tools
     validate_sudo
     validate_artifacts
     validate_pull_secret
@@ -453,15 +438,14 @@ main() {
     setup_dev_scripts
     echo ""
 
-    # Run dev-scripts ABI pipeline — individual targets, skipping
-    # 'requirements' (01_install_requirements.sh) and 'configure'
-    # (02_configure_host.sh) which install libvirt/qemu packages and
-    # create VM networks. Baremetal deploys to real hardware via Redfish.
-    info "Starting dev-scripts ABI pipeline (baremetal — no VM setup)..."
+    # Run dev-scripts ABI pipeline. Includes 'requirements' to install system
+    # dependencies (nmstate, netaddr, ansible, etc.). Skips 'configure'
+    # (02_configure_host.sh) which creates libvirt networks and VMs.
+    info "Starting dev-scripts ABI pipeline..."
     info "This will take 30-60 minutes on baremetal nodes."
     echo ""
 
-    if make -C "${DEV_SCRIPTS_PATH}" agent_requirements agent_build_installer agent_prepare_release agent_configure agent_create_cluster; then
+    if make -C "${DEV_SCRIPTS_PATH}" requirements agent_requirements agent_build_installer agent_prepare_release agent_configure agent_create_cluster; then
         echo ""
         info "Baremetal TNF cluster deployed successfully!"
         info "Kubeconfig: ${DEV_SCRIPTS_PATH}/ocp/${CLUSTER_NAME}/auth/kubeconfig"

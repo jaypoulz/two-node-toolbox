@@ -53,12 +53,27 @@ api_vip=192.168.1.100
 iso_url=http://10.1.235.49:8080/dev-scripts/ostest/agent.x86_64.iso
 
 [provisioning_host]
-# Remote host where dev-scripts runs (all optional).
-# ssh_target       - user@host for SSH access to the provisioning machine
-# ssh_key          - Path to SSH private key (omit to use ssh-agent/default)
-# dev_scripts_path - dev-scripts checkout on the remote host
-# working_dir      - Working directory on the remote host for adoption artifacts
-#ssh_target=root@hypervisor.example.com
-#ssh_key=~/.ssh/id_ed25519
+# Provisioning host for baremetal ABI deployment. Must be on the same L2 network
+# as the baremetal nodes (serves agent ISO via HTTP, runs dnsmasq, acts as gateway).
+#
+# If this section is configured, deploy-baremetal.sh syncs artifacts to the host
+# and runs the deployment there via SSH. If absent, deployment runs locally.
+#
+# Required:
+#   ssh_target       - user@host for SSH access (key-based auth required)
+#
+# Optional:
+#   ssh_key            - Path to SSH private key (default: ssh-agent or ~/.ssh/id_rsa)
+#   dev_scripts_path   - DEV_SCRIPTS_PATH on the remote host
+#                        (default: ~/openshift-metal3/dev-scripts)
+#   dev_scripts_repo   - Git repo URL for dev-scripts (default: upstream openshift-metal3)
+#   dev_scripts_branch - Git branch to checkout (default: repo's current branch)
+#   working_dir        - Remote staging directory for TNT artifacts
+#                        (default: ~/tnt-baremetal)
+#
+#ssh_target=root@10.1.155.50
+#ssh_key=~/.ssh/lab_key
 #dev_scripts_path=~/openshift-metal3/dev-scripts
+#dev_scripts_repo=https://github.com/myuser/dev-scripts
+#dev_scripts_branch=my-feature-branch
 #working_dir=~/tnt-baremetal
