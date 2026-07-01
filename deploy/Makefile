@@ -126,6 +126,8 @@ help:
 	@echo "  arbiter-kcli         - Deploy arbiter cluster using kcli (non-interactive)"
 	@echo "  fencing-kcli         - Deploy fencing cluster using kcli (non-interactive)"
 	@echo "  fencing-assisted     - Deploy hub + spoke TNF cluster via assisted installer"
+	@echo "  sno-ipi              - Deploy Single Node OpenShift (SNO) IPI cluster (non-interactive)"
+	@echo "  sno-agent            - Deploy Single Node OpenShift (SNO) Agent cluster (non-interactive)"
 	@echo ""
 	@echo "OpenShift Cluster Management:"
 	@echo "  redeploy-cluster     - Redeploy OpenShift cluster using dev-scripts make redeploy"
