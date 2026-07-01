@@ -194,24 +194,6 @@ setup_dev_scripts() {
     fi
     mkdir -p "${working_dir}"
 
-    # Resolve PROVISIONING_HOST_EXTERNAL_IP for baremetal.
-    # In the libvirt flow this is the host running dnsmasq on the virtual bridge.
-    # For baremetal, the nodes use real network infrastructure — default to the
-    # gateway as DNS server (common in lab networks). Override with BAREMETAL_DNS
-    # if the lab has a dedicated DNS server.
-    local prov_ip=""
-    prov_ip=$(grep -oP '^export PROVISIONING_HOST_EXTERNAL_IP="\K[^"]+' "${CONFIG_FILE}" || true)
-    if [[ -z "${prov_ip}" ]]; then
-        local dns_ip="${BAREMETAL_DNS:-}"
-        if [[ -z "${dns_ip}" ]]; then
-            dns_ip=$(grep -oP '^export BAREMETAL_GATEWAY="\K[^"]+' "${CONFIG_FILE}" || true)
-        fi
-        if [[ -z "${dns_ip}" ]]; then
-            die "Cannot determine DNS server for nodes. Set BAREMETAL_DNS or BAREMETAL_GATEWAY in config."
-        fi
-        info "Setting PROVISIONING_HOST_EXTERNAL_IP=${dns_ip} (from BAREMETAL_DNS/BAREMETAL_GATEWAY)"
-    fi
-
     info "Deploying config to dev-scripts"
     {
         cat "${CONFIG_FILE}"
@@ -219,11 +201,6 @@ setup_dev_scripts() {
             echo ""
             echo "# Working directory (set by deploy-baremetal.sh)"
             echo "export WORKING_DIR=\"${working_dir}\""
-        fi
-        if [[ -z "${prov_ip}" && -n "${dns_ip:-}" ]]; then
-            echo ""
-            echo "# DNS/gateway for node NMState config (set by deploy-baremetal.sh)"
-            echo "export PROVISIONING_HOST_EXTERNAL_IP=\"${dns_ip}\""
         fi
     } > "${DEV_SCRIPTS_PATH}/config_${ds_user}.sh"
     cp "${PULL_SECRET}" "${DEV_SCRIPTS_PATH}/pull_secret.json"
