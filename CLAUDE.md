@@ -15,6 +15,8 @@ Two-Node Toolbox (TNF) is a comprehensive deployment automation framework for Op
 # Deploy AWS hypervisor and cluster in one command
 make deploy arbiter-ipi   # Deploy arbiter topology cluster
 make deploy fencing-ipi   # Deploy fencing topology cluster
+make deploy sno-ipi       # Deploy Single Node OpenShift (IPI method)
+make deploy sno-agent     # Deploy Single Node OpenShift (Agent method)
 make deploy fencing-assisted   # Deploy hub + spoke TNF via assisted installer
 
 # Instance lifecycle management
@@ -118,13 +120,15 @@ make shellcheck
 
 - **Two-Node with Arbiter (TNA)**: Master nodes + separate arbiter node for quorum
 - **Two-Node with Fencing (TNF)**: Master nodes with BMC-based fencing for high availability
+- **Single Node OpenShift (SNO)**: Single master node for resource-constrained environments
 
 ### Key Configuration Files
 
 #### Dev-scripts Method
 - `inventory.ini`: Ansible inventory (copy from `inventory.ini.sample`)
 - `roles/dev-scripts/install-dev/files/config_arbiter.sh`: Arbiter topology config
-- `roles/dev-scripts/install-dev/files/config_fencing.sh`: Fencing topology config  
+- `roles/dev-scripts/install-dev/files/config_fencing.sh`: Fencing topology config
+- `roles/dev-scripts/install-dev/files/config_sno.sh`: Single Node OpenShift config
 - `roles/dev-scripts/install-dev/files/pull-secret.json`: OpenShift pull secret
 
 #### Kcli Method

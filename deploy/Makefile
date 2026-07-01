@@ -1,5 +1,5 @@
 # Valid cluster types for 'make deploy <cluster-type>'
-VALID_CLUSTER_TYPES := fencing-ipi fencing-agent fencing-assisted arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli
+VALID_CLUSTER_TYPES := fencing-ipi fencing-agent fencing-assisted arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli sno-ipi sno-agent
 
 # Handle 'make deploy <cluster-type>' pattern
 # When 'deploy' is first, validate any following arguments are valid cluster types
@@ -73,6 +73,12 @@ arbiter-ipi:
 arbiter-agent:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology arbiter --method agent
 
+sno-ipi:
+	@./openshift-clusters/scripts/deploy-cluster.sh --topology sno --method ipi
+
+sno-agent:
+	@./openshift-clusters/scripts/deploy-cluster.sh --topology sno --method agent
+
 arbiter-kcli:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology arbiter --method kcli
 
@@ -120,6 +126,8 @@ help:
 	@echo "  arbiter-kcli         - Deploy arbiter cluster using kcli (non-interactive)"
 	@echo "  fencing-kcli         - Deploy fencing cluster using kcli (non-interactive)"
 	@echo "  fencing-assisted     - Deploy hub + spoke TNF cluster via assisted installer"
+	@echo "  sno-ipi              - Deploy Single Node OpenShift (SNO) IPI cluster (non-interactive)"
+	@echo "  sno-agent            - Deploy Single Node OpenShift (SNO) Agent cluster (non-interactive)"
 	@echo ""
 	@echo "OpenShift Cluster Management:"
 	@echo "  redeploy-cluster     - Redeploy OpenShift cluster using dev-scripts make redeploy"

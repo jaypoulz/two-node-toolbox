@@ -40,6 +40,7 @@
     expected_prefix:
       arbiter: "TNA"
       fencing: "TNF"
+      sno: "SNO"
   fail:
     msg: >-
       Config file {{ config_file[method] }} has AGENT_E2E_TEST_SCENARIO="{{ config_scenario }}"

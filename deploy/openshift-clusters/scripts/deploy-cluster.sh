@@ -49,7 +49,7 @@ done
 
 # Validate required arguments
 if [[ -z "${TOPOLOGY}" ]]; then
-    echo "Error: --topology is required (arbiter or fencing)"
+    echo "Error: --topology is required (arbiter, fencing, or sno)"
     exit 1
 fi
 
@@ -59,8 +59,8 @@ if [[ -z "${METHOD}" ]]; then
 fi
 
 # Validate topology value
-if [[ "${TOPOLOGY}" != "arbiter" && "${TOPOLOGY}" != "fencing" ]]; then
-    echo "Error: Invalid topology '${TOPOLOGY}'. Must be 'arbiter' or 'fencing'."
+if [[ "${TOPOLOGY}" != "arbiter" && "${TOPOLOGY}" != "fencing" && "${TOPOLOGY}" != "sno" ]]; then
+    echo "Error: Invalid topology '${TOPOLOGY}'. Must be 'arbiter', 'fencing', or 'sno'."
     exit 1
 fi
 

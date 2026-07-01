@@ -17,6 +17,8 @@ cd deploy/
 make deploy arbiter-ipi    # Two-Node with Arbiter (IPI method)
 make deploy arbiter-agent  # Two-Node with Arbiter (Agent method)
 make deploy fencing-ipi    # Two-Node with Fencing (IPI method)
+make deploy sno-ipi        # Single Node OpenShift (IPI method)
+make deploy sno-agent      # Single Node OpenShift (Agent method)
 
 # Other useful commands
 make ssh                   # SSH into hypervisor
@@ -61,6 +63,8 @@ See [deploy/openshift-clusters/README-external-host.md](deploy/openshift-cluster
 **Two-Node with Arbiter (TNA)**: Two master nodes with a separate arbiter node for quorum. See [docs/arbiter/README.md](docs/arbiter/README.md)
 
 **Two-Node with Fencing (TNF)**: Two master nodes with BMC-based fencing for automated node recovery. See [docs/fencing/README.md](docs/fencing/README.md)
+
+**Single Node OpenShift (SNO)**: Single master node deployment for resource-constrained environments. Supports both IPI (`sno-ipi`) and Agent-based (`sno-agent`) installation methods.
 
 ## First-Time Setup Helper
 
