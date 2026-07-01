@@ -1,38 +1,87 @@
 ---
-- name: "[topology] Scale CVO to 0 replicas"
+- name: "[topology] Check if oc adm transition topology command is available"
   shell: |
-    oc scale deployment cluster-version-operator -n openshift-cluster-version --replicas=0
+    oc adm transition topology --help
   environment: "{{ sno_oc_env }}"
-
-- name: "[topology] Wait for CVO to scale down"
-  shell: |
-    oc get deployment cluster-version-operator -n openshift-cluster-version \
-      -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0"
-  environment: "{{ sno_oc_env }}"
-  register: cvo_replicas
-  until: cvo_replicas.stdout | trim | int == 0
-  retries: 30
-  delay: 5
+  register: topology_cmd_check
   changed_when: false
+  failed_when: false
 
-- name: "[topology] CVO scaled down"
+- name: "[topology] Skip topology transition if command not available"
   debug:
-    msg: "CVO scaled to 0 replicas"
+    msg: "oc adm transition topology command not available - skipping topology transition tasks"
+  when: topology_cmd_check.rc != 0
 
-- name: "[topology] Patch Infrastructure CR - topology to HighlyAvailable"
+- name: "[topology] Validate cluster readiness for transition"
+  shell: |
+    oc adm transition topology --control-plane=HighlyAvailable --infrastructure=HighlyAvailable
+  environment: "{{ sno_oc_env }}"
+  register: preflight_check
+  changed_when: false
+  failed_when: false
+  when: topology_cmd_check.rc == 0
+
+- name: "[topology] Display preflight results"
+  debug:
+    msg: "{{ preflight_check.stdout }}"
+  when: topology_cmd_check.rc == 0
+
+- name: "[topology] Check preflight result"
+  fail:
+    msg: "Preflight validation failed. See output above for details."
+  when:
+    - topology_cmd_check.rc == 0
+    - preflight_check.rc != 0
+
+- name: "[topology] Initiate topology transition to HighlyAvailable"
+  shell: |
+    oc adm transition topology --control-plane=HighlyAvailable --infrastructure=HighlyAvailable --confirm
+  environment: "{{ sno_oc_env }}"
+  register: transition_result
+  failed_when: false
+  when: topology_cmd_check.rc == 0
+
+- name: "[topology] Display transition result"
+  debug:
+    msg: "{{ transition_result.stdout }}"
+  when: topology_cmd_check.rc == 0
+
+- name: "[topology] Check transition result"
+  fail:
+    msg: "Topology transition command failed. See output above for details."
+  when:
+    - topology_cmd_check.rc == 0
+    - transition_result.rc != 0
+
+- name: "[topology] Verify Infrastructure.spec.controlPlaneTopology updated"
+  shell: |
+    oc get infrastructure cluster -o jsonpath='{.spec.controlPlaneTopology}'
+  environment: "{{ sno_oc_env }}"
+  register: topo_spec_verify
+  changed_when: false
+  failed_when: topo_spec_verify.stdout != "HighlyAvailable"
+  retries: 3
+  delay: 2
+  until: topo_spec_verify.stdout == "HighlyAvailable"
+  when: topology_cmd_check.rc == 0
+
+- name: "[topology] Patch Infrastructure.status (simulating controller)"
   shell: |
     oc patch infrastructure cluster --type merge --subresource status \
       -p '{"status":{"controlPlaneTopology":"HighlyAvailable","infrastructureTopology":"HighlyAvailable"}}'
   environment: "{{ sno_oc_env }}"
+  when: topology_cmd_check.rc == 0
 
-- name: "[topology] Verify topology patch"
+- name: "[topology] Verify Infrastructure.status updated"
   shell: |
     oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}'
   environment: "{{ sno_oc_env }}"
-  register: topo_verify
+  register: topo_status_verify
   changed_when: false
-  failed_when: topo_verify.stdout != "HighlyAvailable"
+  failed_when: topo_status_verify.stdout != "HighlyAvailable"
+  when: topology_cmd_check.rc == 0
 
 - name: "[topology] Topology transition complete"
   debug:
-    msg: "Topology changed to HighlyAvailable. MCO rollout will begin."
+    msg: "Topology spec and status updated to HighlyAvailable. Cluster will begin scaling control plane components."
+  when: topology_cmd_check.rc == 0
