@@ -37,10 +37,11 @@ declare -a NODE_BOOT_MACS=()
 declare -a NODE_DATA_MACS=()
 declare -a NODE_IPS=()
 
-# Cluster-wide network config (optional, from [baremetal_network])
+# Cluster-wide network config (from [baremetal_network])
 MACHINE_NETWORK=""
 API_VIP=""
 INGRESS_VIP=""
+ISO_URL=""
 
 # Group defaults
 BMC_PORT="443"
@@ -147,6 +148,7 @@ parse_inventory() {
                 machine_network) MACHINE_NETWORK="${val}" ;;
                 api_vip)         API_VIP="${val}" ;;
                 ingress_vip)     INGRESS_VIP="${val}" ;;
+                iso_url)         ISO_URL="${val}" ;;
             esac
             continue
         fi
@@ -435,9 +437,11 @@ generate_baremetal_config() {
 
         # BAREMETAL_API_VIP is required — set_api_and_ingress_vip() needs it
         [[ -z "${API_VIP}" ]] && die "api_vip is required in [baremetal_network] for baremetal deploy"
+        [[ -z "${ISO_URL}" ]] && die "iso_url is required in [baremetal_network] for baremetal deploy"
         echo ""
         echo "# Baremetal network config"
         echo "export BAREMETAL_API_VIP=\"${API_VIP}\""
+        echo "export BAREMETAL_ISO_SERVER=\"${ISO_URL}\""
         [[ -n "${MACHINE_NETWORK}" ]] && echo "export EXTERNAL_SUBNET_V4=\"${MACHINE_NETWORK}\""
         [[ -n "${INGRESS_VIP}" ]] && echo "export BAREMETAL_INGRESS_VIP=\"${INGRESS_VIP}\""
 

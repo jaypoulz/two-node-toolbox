@@ -238,6 +238,23 @@ prompt_node_ip() {
     done
 }
 
+prompt_iso_url() {
+    local url
+    while true; do
+        read -rp "  ISO URL for VirtualMedia boot (e.g. http://host:8080/path/agent.x86_64.iso): " url
+        if [[ -z "${url}" ]]; then
+            echo "  Error: ISO URL is required — BMCs mount the agent ISO via Redfish VirtualMedia" >&2
+            continue
+        fi
+        if ! [[ "${url}" =~ ^https?:// ]]; then
+            echo "  Error: expected http:// or https:// URL" >&2
+            continue
+        fi
+        echo "${url}"
+        return
+    done
+}
+
 prompt_machine_network() {
     local cidr
     while true; do
@@ -360,6 +377,7 @@ show_summary() {
     echo "    API VIP:         ${WIZ_API_VIP}"
     [[ -n "${WIZ_INGRESS_VIP}" ]] && echo "    Ingress VIP:     ${WIZ_INGRESS_VIP}"
     [[ -n "${WIZ_MACHINE_NETWORK}" ]] && echo "    Machine network: ${WIZ_MACHINE_NETWORK}"
+    echo "    ISO URL:         ${WIZ_ISO_URL}"
 
     if [[ -n "${WIZ_SSH_TARGET}" ]]; then
         echo ""
@@ -413,6 +431,7 @@ run_wizard() {
         WIZ_API_VIP="$(prompt_api_vip)"
         WIZ_INGRESS_VIP="$(prompt_ingress_vip)"
         WIZ_MACHINE_NETWORK="$(prompt_machine_network)"
+        WIZ_ISO_URL="$(prompt_iso_url)"
 
         echo ""
         echo "--- Provisioning Host (optional) ---"
@@ -498,6 +517,7 @@ write_inventory() {
         else
             echo "#machine_network="
         fi
+        echo "iso_url=${WIZ_ISO_URL}"
 
         echo ""
         echo "[provisioning_host]"
@@ -543,6 +563,7 @@ declare -a WIZ_NODE_IPS=()
 WIZ_MACHINE_NETWORK=""
 WIZ_API_VIP=""
 WIZ_INGRESS_VIP=""
+WIZ_ISO_URL=""
 WIZ_SSH_TARGET=""
 WIZ_SSH_KEY=""
 WIZ_DEV_SCRIPTS_PATH=""
