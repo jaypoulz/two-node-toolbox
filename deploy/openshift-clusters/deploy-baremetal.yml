@@ -16,6 +16,7 @@
   vars:
     method: agent
     topology: fencing
+    test_cluster_name: ostest
 
   pre_tasks:
     - name: Check adoption artifacts exist on controller
@@ -45,8 +46,10 @@
         name: dev-scripts/install-dev
         tasks_from: config
       vars:
+        method: agent
         config_file:
           agent: config_baremetal_fencing.sh
+        install_host_deps: false
 
     # --- Git checkout ---
     - name: Checkout dev-scripts
@@ -72,11 +75,45 @@
         regexp: '^export WORKING_DIR='
         line: 'export WORKING_DIR="${HOME}/dev-scripts-workdir"'
 
+    # --- Ensure SSH key exists for node access ---
+    - name: Check for existing SSH keypair
+      ansible.builtin.stat:
+        path: ~/.ssh/id_ed25519
+      register: ssh_key_check
+
+    - name: Generate SSH keypair if missing
+      ansible.builtin.command:
+        cmd: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''
+      when: not ssh_key_check.stat.exists
+
+    - name: Read SSH public key
+      ansible.builtin.slurp:
+        src: ~/.ssh/id_ed25519.pub
+      register: ssh_pub_key
+
+    - name: Append SSH_PUB_KEY to deployed config
+      ansible.builtin.lineinfile:
+        path: "{{ dev_scripts_path }}/config_{{ whoami.stdout }}.sh"
+        regexp: '^export SSH_PUB_KEY='
+        line: 'export SSH_PUB_KEY="{{ ssh_pub_key.content | b64decode | trim }}"'
+
     - name: Create empty mirror registry credentials
       ansible.builtin.shell: |
         f="${HOME}/private-mirror-{{ test_cluster_name }}.json"
         [ -f "$f" ] || echo '{"auths":{}}' > "$f"
       changed_when: false
+
+    # --- Clean stale installer state from prior runs ---
+    - name: Remove stale installer state
+      ansible.builtin.file:
+        path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/{{ item }}"
+        state: absent
+      loop:
+        - .openshift_install_state.json
+        - .openshift_install.log
+        - agent.x86_64.iso
+        - cluster-manifests
+        - openshift
 
     # --- Deploy ---
     - name: Run dev-scripts ABI pipeline
@@ -119,9 +156,17 @@
         dest: "clusters/{{ test_cluster_name }}/auth/kubeadmin-password"
         flat: true
 
+    - name: Fetch SSH private key to controller
+      ansible.builtin.fetch:
+        src: ~/.ssh/id_ed25519
+        dest: "clusters/{{ test_cluster_name }}/auth/id_ed25519"
+        flat: true
+        mode: "0600"
+
     - name: Display access information
       ansible.builtin.debug:
         msg: |
           Baremetal TNF cluster deployed successfully!
           Kubeconfig: clusters/{{ test_cluster_name }}/auth/kubeconfig
           Usage: export KUBECONFIG=$(pwd)/clusters/{{ test_cluster_name }}/auth/kubeconfig
+          SSH:   ssh -i clusters/{{ test_cluster_name }}/auth/id_ed25519 core@<node-ip>

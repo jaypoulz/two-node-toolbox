@@ -125,3 +125,4 @@
       - containernetworking-plugins
     state: present
   become: true
+  when: install_host_deps | default(true)
