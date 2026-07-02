@@ -34,6 +34,7 @@ declare -a NODE_NAMES=()
 declare -a NODE_BMC_ADDRS=()
 declare -a NODE_BMC_USERS=()
 declare -a NODE_BMC_PASSES=()
+declare -a NODE_BMC_PORTS=()
 declare -a NODE_BOOT_MACS=()
 declare -a NODE_IPS=()
 
@@ -44,6 +45,7 @@ API_VIP=""
 INGRESS_VIP=""
 
 # Group defaults
+BMC_PORT="443"
 BMC_VERIFY_CA="False"
 CPU_ARCH="x86_64"
 
@@ -136,6 +138,7 @@ parse_inventory() {
             key="${line%%=*}"
             val="${line#*=}"
             case "${key}" in
+                bmc_port)      BMC_PORT="${val}" ;;
                 bmc_verify_ca) BMC_VERIFY_CA="${val}" ;;
                 cpu_arch)      CPU_ARCH="${val}" ;;
             esac
@@ -160,7 +163,7 @@ parse_inventory() {
             name="${line%% *}"
             rest="${line#* }"
 
-            local bmc_address="" bmc_user="" bmc_pass="" boot_mac="" node_ip=""
+            local bmc_address="" bmc_user="" bmc_pass="" bmc_port="" boot_mac="" node_ip=""
             for pair in ${rest}; do
                 local key val
                 key="${pair%%=*}"
@@ -169,6 +172,7 @@ parse_inventory() {
                     bmc_address) bmc_address="${val}" ;;
                     bmc_user)    bmc_user="${val}" ;;
                     bmc_pass)    bmc_pass="${val}" ;;
+                    bmc_port)    bmc_port="${val}" ;;
                     boot_mac)    boot_mac="${val}" ;;
                     node_ip)     node_ip="${val}" ;;
                 esac
@@ -182,6 +186,7 @@ parse_inventory() {
             NODE_BMC_ADDRS+=("${bmc_address}")
             NODE_BMC_USERS+=("${bmc_user}")
             NODE_BMC_PASSES+=("${bmc_pass}")
+            NODE_BMC_PORTS+=("${bmc_port:-${BMC_PORT}}")
             NODE_BOOT_MACS+=("${boot_mac}")
             NODE_IPS+=("${node_ip}")
         fi
@@ -205,31 +210,31 @@ bmc_curl() {
 }
 
 discover_redfish_system_id() {
-    local bmc_address="$1" bmc_user="$2" bmc_pass="$3"
+    local bmc_address="$1" bmc_user="$2" bmc_pass="$3" bmc_port="$4"
 
     local systems_json
     systems_json=$(bmc_curl \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_address}/redfish/v1/Systems/" 2>/dev/null) || return 1
+        "https://${bmc_address}:${bmc_port}/redfish/v1/Systems/" 2>/dev/null) || return 1
 
     echo "${systems_json}" | jq -r '.Members[0]."@odata.id" // empty' 2>/dev/null
 }
 
 discover_boot_mac() {
-    local bmc_address="$1" bmc_user="$2" bmc_pass="$3" system_id="$4"
+    local bmc_address="$1" bmc_user="$2" bmc_pass="$3" bmc_port="$4" system_id="$5"
 
     # Get boot order from the system resource
     local boot_order
     boot_order=$(bmc_curl \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_address}/${system_id}" 2>/dev/null \
+        "https://${bmc_address}:${bmc_port}/${system_id}" 2>/dev/null \
         | jq -r '.Boot.BootOrder[]' 2>/dev/null) || return 1
 
     # Fetch all boot options and index by BootOptionReference
     local options_json
     options_json=$(bmc_curl \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_address}/${system_id}/BootOptions/" 2>/dev/null) || return 1
+        "https://${bmc_address}:${bmc_port}/${system_id}/BootOptions/" 2>/dev/null) || return 1
 
     local option_paths
     option_paths=$(echo "${options_json}" | jq -r '.Members[]."@odata.id"' 2>/dev/null) || return 1
@@ -240,7 +245,7 @@ discover_boot_mac() {
         local option
         option=$(bmc_curl \
             -u "${bmc_user}:${bmc_pass}" \
-            "https://${bmc_address}${option_url}" 2>/dev/null) || continue
+            "https://${bmc_address}:${bmc_port}${option_url}" 2>/dev/null) || continue
 
         local ref
         ref=$(echo "${option}" | jq -r '.BootOptionReference // empty' 2>/dev/null)
@@ -265,17 +270,17 @@ discover_boot_mac() {
 }
 
 verify_bmc() {
-    local name="$1" bmc_address="$2" bmc_user="$3" bmc_pass="$4"
+    local name="$1" bmc_address="$2" bmc_user="$3" bmc_pass="$4" bmc_port="$5"
     local rc=0
 
-    printf "  %-12s %-20s " "${name}" "${bmc_address}"
+    printf "  %-12s %-20s " "${name}" "${bmc_address}:${bmc_port}"
 
     # Verify Redfish root is reachable and credentials work
     local http_code
     http_code=$(bmc_curl \
         -o /dev/null -w '%{http_code}' \
         -u "${bmc_user}:${bmc_pass}" \
-        "https://${bmc_address}/redfish/v1/" 2>/dev/null) || http_code="000"
+        "https://${bmc_address}:${bmc_port}/redfish/v1/" 2>/dev/null) || http_code="000"
 
     if [[ "${http_code}" == "200" ]]; then
         echo "OK (HTTP ${http_code})"
@@ -300,7 +305,7 @@ verify_all_bmcs() {
     local failed=0
     for ((i = 0; i < ${#NODE_NAMES[@]}; i++)); do
         if ! verify_bmc "${NODE_NAMES[$i]}" "${NODE_BMC_ADDRS[$i]}" \
-                "${NODE_BMC_USERS[$i]}" "${NODE_BMC_PASSES[$i]}"; then
+                "${NODE_BMC_USERS[$i]}" "${NODE_BMC_PASSES[$i]}" "${NODE_BMC_PORTS[$i]}"; then
             failed=$((failed + 1))
         fi
     done
@@ -329,6 +334,7 @@ generate_ironic_nodes_json() {
         local bmc_address="${NODE_BMC_ADDRS[$i]}"
         local bmc_user="${NODE_BMC_USERS[$i]}"
         local bmc_pass="${NODE_BMC_PASSES[$i]}"
+        local bmc_port="${NODE_BMC_PORTS[$i]}"
         local boot_mac="${NODE_BOOT_MACS[$i]}"
 
         # Discover Redfish system path (requires BMC access)
@@ -336,7 +342,7 @@ generate_ironic_nodes_json() {
         if ${SKIP_VERIFY}; then
             system_id="redfish/v1/Systems/1"
         else
-            system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" 2>/dev/null) || true
+            system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_port}" 2>/dev/null) || true
             system_id="${system_id:-/redfish/v1/Systems/1}"
             system_id="${system_id#/}"
             system_id="${system_id%/}"
@@ -350,7 +356,7 @@ generate_ironic_nodes_json() {
                 continue
             fi
             info "  ${name}: boot_mac not set, attempting Redfish discovery..."
-            boot_mac=$(discover_boot_mac "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${system_id}" 2>/dev/null) || true
+            boot_mac=$(discover_boot_mac "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_port}" "${system_id}" 2>/dev/null) || true
             if [[ -n "${boot_mac}" ]]; then
                 info "  ${name}: discovered boot MAC ${boot_mac}"
             else
@@ -362,7 +368,7 @@ generate_ironic_nodes_json() {
 
         nodes+=("$(jq -n \
             --arg name "${name}" \
-            --arg addr "redfish://${bmc_address}/${system_id}" \
+            --arg addr "redfish://${bmc_address}:${bmc_port}/${system_id}" \
             --arg user "${bmc_user}" \
             --arg pass "${bmc_pass}" \
             --arg verify_ca "${BMC_VERIFY_CA}" \

@@ -12,6 +12,7 @@
 #   bmc_address - BMC/iDRAC/iLO management address (IP or hostname)
 #   bmc_user   - BMC login username
 #   bmc_pass   - BMC login password
+#   bmc_port   - (optional) BMC Redfish port (default: 443)
 #   boot_mac   - (optional) MAC address of the NIC used for PXE boot
 #                If omitted, the adopt script attempts Redfish discovery.
 #   node_ip    - (optional) Static IP address for this node on the machine network
@@ -27,6 +28,9 @@ master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:
 [baremetal_nodes:vars]
 # BMC driver — only redfish is supported for TNF fencing
 bmc_driver=redfish
+
+# BMC Redfish port (per-node bmc_port overrides this)
+bmc_port=443
 
 # Skip TLS verification for BMC endpoints (common with self-signed certs)
 bmc_verify_ca=False
