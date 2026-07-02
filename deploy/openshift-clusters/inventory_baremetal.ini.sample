@@ -40,40 +40,40 @@ bmc_verify_ca=False
 cpu_arch=x86_64
 
 [baremetal_network]
-# Cluster-wide network config for baremetal deploy.
+# Cluster-wide network config for baremetal ABI deployments.
 # api_vip         - API virtual IP (required)
-# ingress_vip     - (optional) Ingress virtual IP — defaults to api_vip if omitted
-# machine_network - (optional) Machine network CIDR (e.g. 192.168.1.0/24)
+# ingress_vip     - Ingress virtual IP (optional, defaults to api_vip)
+# machine_network - Machine network CIDR (e.g. 192.168.1.0/24)
+# gateway         - Default gateway IP
+# dns_servers     - Comma-separated DNS server IPs reachable from the nodes.
+#                   Used as the node DNS resolver during install (resolves quay.io, etc.).
+#                   If unset, falls back to gateway — which may not run DNS.
 # iso_url         - Full HTTP URL for agent ISO VirtualMedia boot (required)
 #                   Must be reachable from BMCs. dev-scripts stages the ISO at
 #                   ${WORKING_DIR}/${CLUSTER_NAME}/agent.x86_64.iso on the provisioning host.
 api_vip=192.168.1.100
 #ingress_vip=192.168.1.101
 #machine_network=192.168.1.0/24
+#gateway=192.168.1.1
+#dns_servers=10.11.5.160,10.2.32.85
 iso_url=http://10.1.235.49:8080/dev-scripts/ostest/agent.x86_64.iso
 
 [provisioning_host]
 # Provisioning host for baremetal ABI deployment. Must be on the same L2 network
 # as the baremetal nodes (serves agent ISO via HTTP, runs dnsmasq, acts as gateway).
 #
-# If this section is configured, deploy-baremetal.sh syncs artifacts to the host
-# and runs the deployment there via SSH. If absent, deployment runs locally.
+# Standard Ansible inventory format — one host entry with connection variables.
+# For local deployment, use: localhost ansible_connection=local
 #
-# Required:
-#   ssh_target       - user@host for SSH access (key-based auth required)
+#10.1.155.50 ansible_user=root ansible_ssh_private_key_file=~/.ssh/lab_key
+
+[provisioning_host:vars]
+# Override dev-scripts checkout on the provisioning host (optional).
+# Defaults come from roles/dev-scripts/install-dev/defaults/main.yml:
+#   dev_scripts_path=openshift-metal3/dev-scripts
+#   dev_scripts_src_repo=https://github.com/openshift-metal3/dev-scripts
+#   dev_scripts_branch=master
 #
-# Optional:
-#   ssh_key            - Path to SSH private key (default: ssh-agent or ~/.ssh/id_rsa)
-#   dev_scripts_path   - DEV_SCRIPTS_PATH on the remote host
-#                        (default: ~/openshift-metal3/dev-scripts)
-#   dev_scripts_repo   - Git repo URL for dev-scripts (default: upstream openshift-metal3)
-#   dev_scripts_branch - Git branch to checkout (default: repo's current branch)
-#   working_dir        - Remote staging directory for TNT artifacts
-#                        (default: ~/tnt-baremetal)
-#
-#ssh_target=root@10.1.155.50
-#ssh_key=~/.ssh/lab_key
 #dev_scripts_path=~/openshift-metal3/dev-scripts
-#dev_scripts_repo=https://github.com/myuser/dev-scripts
+#dev_scripts_src_repo=https://github.com/myuser/dev-scripts
 #dev_scripts_branch=my-feature-branch
-#working_dir=~/tnt-baremetal

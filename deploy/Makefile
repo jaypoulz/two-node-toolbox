@@ -152,7 +152,7 @@ help:
 	@echo ""
 	@echo "Baremetal Adoption:"
 	@echo "  baremetal-adopt           - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
-	@echo "  baremetal-fencing-agent   - Deploy TNF cluster on adopted baremetal nodes (local dev-scripts ABI)"
+	@echo "  baremetal-fencing-agent   - Deploy TNF cluster on adopted baremetal nodes via provisioning host"
 	@echo "  baremetal-verify          - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
 	@echo "  baremetal-wizard          - Interactive wizard to create baremetal node inventory"
 	@echo ""

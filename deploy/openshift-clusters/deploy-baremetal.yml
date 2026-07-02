@@ -1,0 +1,127 @@
+---
+# Deploy a TNF fencing cluster on adopted baremetal nodes via dev-scripts ABI.
+#
+# Targets the [provisioning_host] group from inventory_baremetal.ini.
+# Expects adoption artifacts from 'make baremetal-adopt' in
+# roles/dev-scripts/install-dev/files/.
+#
+# Usage:
+#   ansible-playbook deploy-baremetal.yml -i inventory_baremetal.ini
+#   ansible-playbook deploy-baremetal.yml -i inventory_baremetal.ini -e dev_scripts_branch=my-branch
+#
+- hosts: provisioning_host
+  gather_facts: no
+  force_handlers: yes
+
+  vars:
+    method: agent
+    topology: fencing
+
+  pre_tasks:
+    - name: Check adoption artifacts exist on controller
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/roles/dev-scripts/install-dev/files/{{ item }}"
+      delegate_to: localhost
+      become: false
+      register: artifact_check
+      loop:
+        - config_baremetal_fencing.sh
+        - ironic_nodes.json
+
+    - name: Fail if adoption artifacts are missing
+      ansible.builtin.fail:
+        msg: >-
+          Adoption artifact not found: {{ item.item }}.
+          Run 'make baremetal-adopt' first.
+      when: not item.stat.exists
+      loop: "{{ artifact_check.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+  tasks:
+    # --- Validation, config deploy, pull-secret (reused from install-dev role) ---
+    - name: Validate and deploy config + pull-secret
+      ansible.builtin.include_role:
+        name: dev-scripts/install-dev
+        tasks_from: config
+      vars:
+        config_file:
+          agent: config_baremetal_fencing.sh
+
+    # --- Git checkout ---
+    - name: Checkout dev-scripts
+      ansible.builtin.git:
+        dest: "{{ dev_scripts_path }}"
+        repo: "{{ dev_scripts_src_repo }}"
+        version: "{{ dev_scripts_branch }}"
+
+    # --- Baremetal-specific setup ---
+    - name: Copy ironic_nodes.json to dev-scripts
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/roles/dev-scripts/install-dev/files/ironic_nodes.json"
+        dest: "{{ dev_scripts_path }}/ironic_nodes.json"
+        mode: "0600"
+
+    - name: Create working directory
+      ansible.builtin.shell: mkdir -p "${HOME}/dev-scripts-workdir"
+      changed_when: false
+
+    - name: Append WORKING_DIR to deployed config
+      ansible.builtin.lineinfile:
+        path: "{{ dev_scripts_path }}/config_{{ whoami.stdout }}.sh"
+        regexp: '^export WORKING_DIR='
+        line: 'export WORKING_DIR="${HOME}/dev-scripts-workdir"'
+
+    - name: Create empty mirror registry credentials
+      ansible.builtin.shell: |
+        f="${HOME}/private-mirror-{{ test_cluster_name }}.json"
+        [ -f "$f" ] || echo '{"auths":{}}' > "$f"
+      changed_when: false
+
+    # --- Deploy ---
+    - name: Run dev-scripts ABI pipeline
+      block:
+        - name: "dev-scripts: {{ item }}"
+          make:
+            chdir: "{{ dev_scripts_path }}"
+            target: "{{ item }}"
+          loop:
+            - requirements
+            - agent_requirements
+            - agent_build_installer
+            - agent_prepare_release
+            - agent_configure
+            - agent_create_cluster
+      rescue:
+        - name: Display recovery instructions
+          ansible.builtin.debug:
+            msg: |
+              DEPLOYMENT FAILED. To recover:
+                1. Power off baremetal nodes via BMC
+                2. Clean dev-scripts state:
+                   make -C {{ dev_scripts_path }} clean
+                3. Fix the issue and re-run:
+                   make baremetal-fencing-agent
+        - name: Fail after displaying recovery steps
+          ansible.builtin.fail:
+            msg: "dev-scripts ABI pipeline failed"
+
+    # --- Post-deploy: fetch credentials to controller ---
+    - name: Fetch kubeconfig to controller
+      ansible.builtin.fetch:
+        src: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeconfig"
+        dest: "clusters/{{ test_cluster_name }}/auth/kubeconfig"
+        flat: true
+
+    - name: Fetch kubeadmin-password to controller
+      ansible.builtin.fetch:
+        src: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeadmin-password"
+        dest: "clusters/{{ test_cluster_name }}/auth/kubeadmin-password"
+        flat: true
+
+    - name: Display access information
+      ansible.builtin.debug:
+        msg: |
+          Baremetal TNF cluster deployed successfully!
+          Kubeconfig: clusters/{{ test_cluster_name }}/auth/kubeconfig
+          Usage: export KUBECONFIG=$(pwd)/clusters/{{ test_cluster_name }}/auth/kubeconfig
