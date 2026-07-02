@@ -50,7 +50,7 @@ cpu_arch=x86_64
 api_vip=192.168.1.100
 #ingress_vip=192.168.1.101
 #machine_network=192.168.1.0/24
-iso_url=http://provisioner:8080/agent.x86_64.iso
+iso_url=http://10.1.235.49:8080/dev-scripts/ostest/agent.x86_64.iso
 
 [provisioning_host]
 # Remote host where dev-scripts runs (all optional).
