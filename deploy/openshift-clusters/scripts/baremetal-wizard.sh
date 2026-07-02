@@ -229,10 +229,10 @@ prompt_data_mac() {
 prompt_node_ip() {
     local ip
     while true; do
-        read -rp "  Node IP address (Enter to skip): " ip
+        read -rp "  Node IP address: " ip
         if [[ -z "${ip}" ]]; then
-            echo "${ip}"
-            return
+            echo "  Error: node IP is required for baremetal deploy" >&2
+            continue
         fi
         if ! valid_ipv4 "${ip}"; then
             echo "  Error: invalid IPv4 address" >&2
@@ -260,30 +260,13 @@ prompt_machine_network() {
     done
 }
 
-prompt_gateway() {
-    local gw
-    while true; do
-        read -rp "  Gateway IP (Enter to skip): " gw
-        if [[ -z "${gw}" ]]; then
-            echo "${gw}"
-            return
-        fi
-        if ! valid_ipv4 "${gw}"; then
-            echo "  Error: invalid IPv4 address" >&2
-            continue
-        fi
-        echo "${gw}"
-        return
-    done
-}
-
 prompt_api_vip() {
     local vip
     while true; do
-        read -rp "  API VIP (Enter to skip): " vip
+        read -rp "  API VIP: " vip
         if [[ -z "${vip}" ]]; then
-            echo "${vip}"
-            return
+            echo "  Error: API VIP is required for baremetal deploy" >&2
+            continue
         fi
         if ! valid_ipv4 "${vip}"; then
             echo "  Error: invalid IPv4 address" >&2
@@ -377,14 +360,11 @@ show_summary() {
             "${display_ip}"
     done
 
-    if [[ -n "${WIZ_MACHINE_NETWORK}" || -n "${WIZ_GATEWAY}" || -n "${WIZ_API_VIP}" || -n "${WIZ_INGRESS_VIP}" ]]; then
-        echo ""
-        echo "  Cluster Network:"
-        [[ -n "${WIZ_MACHINE_NETWORK}" ]] && echo "    Machine network: ${WIZ_MACHINE_NETWORK}"
-        [[ -n "${WIZ_GATEWAY}" ]] && echo "    Gateway:         ${WIZ_GATEWAY}"
-        [[ -n "${WIZ_API_VIP}" ]] && echo "    API VIP:         ${WIZ_API_VIP}"
-        [[ -n "${WIZ_INGRESS_VIP}" ]] && echo "    Ingress VIP:     ${WIZ_INGRESS_VIP}"
-    fi
+    echo ""
+    echo "  Cluster Network:"
+    echo "    API VIP:         ${WIZ_API_VIP}"
+    [[ -n "${WIZ_INGRESS_VIP}" ]] && echo "    Ingress VIP:     ${WIZ_INGRESS_VIP}"
+    [[ -n "${WIZ_MACHINE_NETWORK}" ]] && echo "    Machine network: ${WIZ_MACHINE_NETWORK}"
 
     if [[ -n "${WIZ_SSH_TARGET}" ]]; then
         echo ""
@@ -434,11 +414,10 @@ run_wizard() {
         done
 
         echo ""
-        echo "--- Cluster Network (all optional) ---"
-        WIZ_MACHINE_NETWORK="$(prompt_machine_network)"
-        WIZ_GATEWAY="$(prompt_gateway)"
+        echo "--- Cluster Network ---"
         WIZ_API_VIP="$(prompt_api_vip)"
         WIZ_INGRESS_VIP="$(prompt_ingress_vip)"
+        WIZ_MACHINE_NETWORK="$(prompt_machine_network)"
 
         echo ""
         echo "--- Provisioning Host (optional) ---"
@@ -501,11 +480,7 @@ write_inventory() {
         if [[ -n "${WIZ_DATA_MACS[$i]}" ]]; then
             line+=" data_mac=${WIZ_DATA_MACS[$i]}"
         fi
-        if [[ -n "${WIZ_NODE_IPS[$i]}" ]]; then
-            line+=" node_ip=${WIZ_NODE_IPS[$i]}"
-        else
-            line+=" #node_ip="
-        fi
+        line+=" node_ip=${WIZ_NODE_IPS[$i]}"
         echo "${line}" >> "${tmp_inventory}"
     done
 
@@ -516,34 +491,21 @@ write_inventory() {
         echo "bmc_port=443"
         echo "bmc_verify_ca=False"
         echo "cpu_arch=x86_64"
-    } >> "${tmp_inventory}"
 
-    {
         echo ""
         echo "[baremetal_network]"
-        if [[ -n "${WIZ_MACHINE_NETWORK}" ]]; then
-            echo "machine_network=${WIZ_MACHINE_NETWORK}"
-        else
-            echo "#machine_network="
-        fi
-        if [[ -n "${WIZ_GATEWAY}" ]]; then
-            echo "gateway=${WIZ_GATEWAY}"
-        else
-            echo "#gateway="
-        fi
-        if [[ -n "${WIZ_API_VIP}" ]]; then
-            echo "api_vip=${WIZ_API_VIP}"
-        else
-            echo "#api_vip="
-        fi
+        echo "api_vip=${WIZ_API_VIP}"
         if [[ -n "${WIZ_INGRESS_VIP}" ]]; then
             echo "ingress_vip=${WIZ_INGRESS_VIP}"
         else
             echo "#ingress_vip="
         fi
-    } >> "${tmp_inventory}"
+        if [[ -n "${WIZ_MACHINE_NETWORK}" ]]; then
+            echo "machine_network=${WIZ_MACHINE_NETWORK}"
+        else
+            echo "#machine_network="
+        fi
 
-    {
         echo ""
         echo "[provisioning_host]"
         if [[ -n "${WIZ_SSH_TARGET}" ]]; then
@@ -586,7 +548,6 @@ declare -a WIZ_MACS=()
 declare -a WIZ_DATA_MACS=()
 declare -a WIZ_NODE_IPS=()
 WIZ_MACHINE_NETWORK=""
-WIZ_GATEWAY=""
 WIZ_API_VIP=""
 WIZ_INGRESS_VIP=""
 WIZ_SSH_TARGET=""

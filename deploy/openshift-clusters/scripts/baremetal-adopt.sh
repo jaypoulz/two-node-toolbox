@@ -39,7 +39,6 @@ declare -a NODE_IPS=()
 
 # Cluster-wide network config (optional, from [baremetal_network])
 MACHINE_NETWORK=""
-GATEWAY=""
 API_VIP=""
 INGRESS_VIP=""
 
@@ -146,7 +145,6 @@ parse_inventory() {
             val="${line#*=}"
             case "${key}" in
                 machine_network) MACHINE_NETWORK="${val}" ;;
-                gateway)         GATEWAY="${val}" ;;
                 api_vip)         API_VIP="${val}" ;;
                 ingress_vip)     INGRESS_VIP="${val}" ;;
             esac
@@ -424,30 +422,24 @@ generate_baremetal_config() {
         echo "export MANAGE_BR_BRIDGE=n"
         echo "export MANAGE_PRO_BRIDGE=n"
         echo "export MANAGE_INT_BRIDGE=n"
+        echo "export AGENT_E2E_TEST_SCENARIO=\"TNF_IPV4_DHCP\""
 
-        if [[ -n "${MACHINE_NETWORK}" || -n "${GATEWAY}" || -n "${API_VIP}" || -n "${INGRESS_VIP}" ]]; then
-            echo ""
-            echo "# Baremetal network config"
-            [[ -n "${MACHINE_NETWORK}" ]] && echo "export EXTERNAL_SUBNET_V4=\"${MACHINE_NETWORK}\""
-            [[ -n "${GATEWAY}" ]] && echo "export BAREMETAL_GATEWAY=\"${GATEWAY}\""
-            [[ -n "${API_VIP}" ]] && echo "export BAREMETAL_API_VIP=\"${API_VIP}\""
-            [[ -n "${INGRESS_VIP}" ]] && echo "export BAREMETAL_INGRESS_VIP=\"${INGRESS_VIP}\""
-        fi
-
-        # Emit BAREMETAL_IPS only if ALL nodes have node_ip set
-        local all_have_ips=true
+        # BAREMETAL_IPS is required — dev-scripts crashes under set -u without it
         local ip_list=""
         for ((i = 0; i < ${#NODE_IPS[@]}; i++)); do
-            if [[ -z "${NODE_IPS[$i]}" ]]; then
-                all_have_ips=false
-                break
-            fi
+            [[ -z "${NODE_IPS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': node_ip is required for baremetal deploy"
             [[ -n "${ip_list}" ]] && ip_list+=","
             ip_list+="${NODE_IPS[$i]}"
         done
-        if ${all_have_ips} && [[ -n "${ip_list}" ]]; then
-            echo "export BAREMETAL_IPS=\"${ip_list}\""
-        fi
+        echo "export BAREMETAL_IPS=\"${ip_list}\""
+
+        # BAREMETAL_API_VIP is required — set_api_and_ingress_vip() needs it
+        [[ -z "${API_VIP}" ]] && die "api_vip is required in [baremetal_network] for baremetal deploy"
+        echo ""
+        echo "# Baremetal network config"
+        echo "export BAREMETAL_API_VIP=\"${API_VIP}\""
+        [[ -n "${MACHINE_NETWORK}" ]] && echo "export EXTERNAL_SUBNET_V4=\"${MACHINE_NETWORK}\""
+        [[ -n "${INGRESS_VIP}" ]] && echo "export BAREMETAL_INGRESS_VIP=\"${INGRESS_VIP}\""
 
         # Emit BAREMETAL_MACS only if ANY node has data_mac set
         local has_data_macs=false
@@ -508,6 +500,10 @@ main() {
     info "Adoption complete. Generated artifacts:"
     echo "    ${nodes_file}"
     echo "    ${output_dir}/config_baremetal_fencing.sh"
+    echo ""
+    echo "  Before deploying, verify these values in ${output_dir}/config_baremetal_fencing.sh:"
+    echo "    - CI_TOKEN        (get from console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com)"
+    echo "    - OPENSHIFT_RELEASE_IMAGE  (find tags at quay.io/openshift-release-dev/ocp-release)"
     echo ""
     echo "  Next: deploy to the nodes using one of the baremetal-deploy* options"
 }

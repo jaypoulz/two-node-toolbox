@@ -18,8 +18,7 @@
 #   data_mac   - (optional) MAC address of the data NIC (for agent-config hostname mapping)
 #                Use when the data NIC differs from the PXE boot NIC (multi-NIC servers).
 #                Emitted as BAREMETAL_MACS in config. If omitted, boot MAC is used.
-#   node_ip    - (optional) Static IP address for this node on the machine network
-#                Required for baremetal ABI deployments with static IPs.
+#   node_ip    - Static IP address for this node on the machine network
 #
 # The hostname (first field) becomes the node name in ironic_nodes.json.
 # For TNF, you need exactly 2 nodes (master-0 and master-1).
@@ -42,15 +41,13 @@ bmc_verify_ca=False
 cpu_arch=x86_64
 
 [baremetal_network]
-# Cluster-wide network config for baremetal ABI deployments (all optional).
-# machine_network - Machine network CIDR (e.g. 192.168.1.0/24)
-# gateway         - Default gateway IP
-# api_vip         - API virtual IP
-# ingress_vip     - Ingress virtual IP
-#machine_network=192.168.1.0/24
-#gateway=192.168.1.1
-#api_vip=192.168.1.100
+# Cluster-wide network config for baremetal deploy.
+# api_vip         - API virtual IP (required)
+# ingress_vip     - (optional) Ingress virtual IP — defaults to api_vip if omitted
+# machine_network - (optional) Machine network CIDR (e.g. 192.168.1.0/24)
+api_vip=192.168.1.100
 #ingress_vip=192.168.1.101
+#machine_network=192.168.1.0/24
 
 [provisioning_host]
 # Remote host where dev-scripts runs (all optional).
