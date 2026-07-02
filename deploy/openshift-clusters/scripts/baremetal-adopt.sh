@@ -9,7 +9,6 @@
 #   baremetal-adopt.sh [options]
 #
 # Options:
-#   --cluster-name NAME   Cluster name for output directory (default: ostest)
 #   --skip-verify         Skip all BMC access (verify + discovery); requires boot_mac in inventory
 #   --verify-only         Only verify BMC credentials, don't generate artifacts
 #   --inventory FILE       Path to baremetal inventory (default: inventory_baremetal.ini)
@@ -23,7 +22,6 @@ set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OC_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-CLUSTER_NAME="${CLUSTER_NAME:-ostest}"
 SKIP_VERIFY=false
 VERIFY_ONLY=false
 CONFIG_BASE=""
@@ -64,10 +62,6 @@ info() { echo "==> $*"; }
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --cluster-name)
-                CLUSTER_NAME="$2"
-                shift 2
-                ;;
             --skip-verify)
                 SKIP_VERIFY=true
                 shift
@@ -85,7 +79,7 @@ parse_args() {
                 shift 2
                 ;;
             -h|--help)
-                head -17 "$0" | tail -12
+                head -16 "$0" | tail -11
                 exit 0
                 ;;
             *)
@@ -482,10 +476,8 @@ main() {
         exit 0
     fi
 
-    # Create output directory
-    local output_dir="${OC_DIR}/clusters/${CLUSTER_NAME}"
-    umask 077
-    mkdir -p "${output_dir}"
+    # Output alongside existing dev-scripts config files
+    local output_dir="${OC_DIR}/roles/dev-scripts/install-dev/files"
 
     # Generate artifacts
     local nodes_file="${output_dir}/ironic_nodes.json"
