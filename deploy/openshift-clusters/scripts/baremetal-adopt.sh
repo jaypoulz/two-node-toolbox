@@ -441,19 +441,14 @@ generate_baremetal_config() {
         [[ -n "${MACHINE_NETWORK}" ]] && echo "export EXTERNAL_SUBNET_V4=\"${MACHINE_NETWORK}\""
         [[ -n "${INGRESS_VIP}" ]] && echo "export BAREMETAL_INGRESS_VIP=\"${INGRESS_VIP}\""
 
-        # Emit BAREMETAL_MACS only if ANY node has data_mac set
-        local has_data_macs=false
+        # BAREMETAL_MACS is required — agent-config needs data NIC MACs for hostname mapping
         local mac_list=""
         for ((i = 0; i < ${#NODE_DATA_MACS[@]}; i++)); do
-            if [[ -n "${NODE_DATA_MACS[$i]}" ]]; then
-                has_data_macs=true
-            fi
+            [[ -z "${NODE_DATA_MACS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': data_mac is required for baremetal deploy"
             [[ -n "${mac_list}" ]] && mac_list+=","
-            mac_list+="${NODE_DATA_MACS[$i]:-${NODE_BOOT_MACS[$i]}}"
+            mac_list+="${NODE_DATA_MACS[$i]}"
         done
-        if ${has_data_macs} && [[ -n "${mac_list}" ]]; then
-            echo "export BAREMETAL_MACS=\"${mac_list}\""
-        fi
+        echo "export BAREMETAL_MACS=\"${mac_list}\""
     } > "${output_file}"
 
     info "  → ${output_file}"

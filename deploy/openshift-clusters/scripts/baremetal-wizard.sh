@@ -205,17 +205,12 @@ prompt_boot_mac() {
 }
 
 prompt_data_mac() {
-    local boot_mac="$1"
     local mac
     while true; do
-        if [[ -n "${boot_mac}" ]]; then
-            read -rp "  Data NIC MAC (Enter to use boot MAC ${boot_mac}): " mac
-        else
-            read -rp "  Data NIC MAC (Enter to skip): " mac
-        fi
+        read -rp "  Data NIC MAC (data network interface): " mac
         if [[ -z "${mac}" ]]; then
-            echo "${mac}"
-            return
+            echo "  Error: data NIC MAC is required for baremetal deploy" >&2
+            continue
         fi
         if ! valid_mac "${mac}"; then
             echo "  Error: invalid MAC (expected XX:XX:XX:XX:XX:XX)" >&2
@@ -409,7 +404,7 @@ run_wizard() {
             WIZ_PASSES+=("$(prompt_bmc_pass)")
             WIZ_PORTS+=("$(prompt_bmc_port)")
             WIZ_MACS+=("$(prompt_boot_mac)")
-            WIZ_DATA_MACS+=("$(prompt_data_mac "${WIZ_MACS[$i]}")")
+            WIZ_DATA_MACS+=("$(prompt_data_mac)")
             WIZ_NODE_IPS+=("$(prompt_node_ip)")
         done
 
@@ -477,9 +472,7 @@ write_inventory() {
         if [[ -n "${WIZ_MACS[$i]}" ]]; then
             line+=" boot_mac=${WIZ_MACS[$i]}"
         fi
-        if [[ -n "${WIZ_DATA_MACS[$i]}" ]]; then
-            line+=" data_mac=${WIZ_DATA_MACS[$i]}"
-        fi
+        line+=" data_mac=${WIZ_DATA_MACS[$i]}"
         line+=" node_ip=${WIZ_NODE_IPS[$i]}"
         echo "${line}" >> "${tmp_inventory}"
     done

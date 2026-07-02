@@ -15,17 +15,16 @@
 #   bmc_port   - (optional) BMC Redfish port (default: 443)
 #   boot_mac   - (optional) MAC address of the NIC used for PXE boot
 #                If omitted, the adopt script attempts Redfish discovery.
-#   data_mac   - (optional) MAC address of the data NIC (for agent-config hostname mapping)
-#                Use when the data NIC differs from the PXE boot NIC (multi-NIC servers).
-#                Emitted as BAREMETAL_MACS in config. If omitted, boot MAC is used.
+#   data_mac   - MAC address of the data NIC (for agent-config hostname mapping)
+#                May differ from boot_mac on multi-NIC servers. Emitted as BAREMETAL_MACS.
 #   node_ip    - Static IP address for this node on the machine network
 #
 # The hostname (first field) becomes the node name in ironic_nodes.json.
 # For TNF, you need exactly 2 nodes (master-0 and master-1).
 
 [baremetal_nodes]
-master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01 node_ip=192.168.1.10 #data_mac=
-master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02 node_ip=192.168.1.11 #data_mac=
+master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01 data_mac=52:54:00:00:00:01 node_ip=192.168.1.10
+master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02 data_mac=52:54:00:00:00:02 node_ip=192.168.1.11
 
 [baremetal_nodes:vars]
 # BMC driver — only redfish is supported for TNF fencing
