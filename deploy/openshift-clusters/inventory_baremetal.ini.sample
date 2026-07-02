@@ -15,6 +15,9 @@
 #   bmc_port   - (optional) BMC Redfish port (default: 443)
 #   boot_mac   - (optional) MAC address of the NIC used for PXE boot
 #                If omitted, the adopt script attempts Redfish discovery.
+#   data_mac   - (optional) MAC address of the data NIC (for agent-config hostname mapping)
+#                Use when the data NIC differs from the PXE boot NIC (multi-NIC servers).
+#                Emitted as BAREMETAL_MACS in config. If omitted, boot MAC is used.
 #   node_ip    - (optional) Static IP address for this node on the machine network
 #                Required for baremetal ABI deployments with static IPs.
 #
@@ -22,8 +25,8 @@
 # For TNF, you need exactly 2 nodes (master-0 and master-1).
 
 [baremetal_nodes]
-master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01 node_ip=192.168.1.10
-master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02 node_ip=192.168.1.11
+master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01 node_ip=192.168.1.10 #data_mac=
+master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02 node_ip=192.168.1.11 #data_mac=
 
 [baremetal_nodes:vars]
 # BMC driver — only redfish is supported for TNF fencing
@@ -48,3 +51,14 @@ cpu_arch=x86_64
 #gateway=192.168.1.1
 #api_vip=192.168.1.100
 #ingress_vip=192.168.1.101
+
+[provisioning_host]
+# Remote host where dev-scripts runs (all optional).
+# ssh_target       - user@host for SSH access to the provisioning machine
+# ssh_key          - Path to SSH private key (omit to use ssh-agent/default)
+# dev_scripts_path - dev-scripts checkout on the remote host
+# working_dir      - Working directory on the remote host for adoption artifacts
+#ssh_target=root@hypervisor.example.com
+#ssh_key=~/.ssh/id_ed25519
+#dev_scripts_path=~/openshift-metal3/dev-scripts
+#working_dir=~/tnt-baremetal

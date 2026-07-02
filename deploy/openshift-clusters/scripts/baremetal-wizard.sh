@@ -204,6 +204,28 @@ prompt_boot_mac() {
     done
 }
 
+prompt_data_mac() {
+    local boot_mac="$1"
+    local mac
+    while true; do
+        if [[ -n "${boot_mac}" ]]; then
+            read -rp "  Data NIC MAC (Enter to use boot MAC ${boot_mac}): " mac
+        else
+            read -rp "  Data NIC MAC (Enter to skip): " mac
+        fi
+        if [[ -z "${mac}" ]]; then
+            echo "${mac}"
+            return
+        fi
+        if ! valid_mac "${mac}"; then
+            echo "  Error: invalid MAC (expected XX:XX:XX:XX:XX:XX)" >&2
+            continue
+        fi
+        echo "${mac}"
+        return
+    done
+}
+
 prompt_node_ip() {
     local ip
     while true; do
@@ -333,23 +355,25 @@ show_summary() {
     echo "=================================="
     echo "  BAREMETAL NODE SUMMARY"
     echo "=================================="
-    printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-17s\n" \
-        "#" "HOSTNAME" "BMC ADDRESS" "BMC USER" "PASSWORD" "BOOT MAC" "NODE IP"
-    printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-17s\n" \
-        "---" "------------" "--------------------------------------------" "--------" "--------" "-----------------" "---------------"
+    printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-19s %-17s\n" \
+        "#" "HOSTNAME" "BMC ADDRESS" "BMC USER" "PASSWORD" "BOOT MAC" "DATA MAC" "NODE IP"
+    printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-19s %-17s\n" \
+        "---" "------------" "--------------------------------------------" "--------" "--------" "-----------------" "-----------------" "---------------"
 
     local i
     for ((i = 0; i < ${#WIZ_NAMES[@]}; i++)); do
         local display_mac="${WIZ_MACS[$i]:-auto-discover}"
+        local display_data_mac="${WIZ_DATA_MACS[$i]:---}"
         local display_ip="${WIZ_NODE_IPS[$i]:---}"
         local display_addr="${WIZ_IPS[$i]}:${WIZ_PORTS[$i]}"
-        printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-17s\n" \
+        printf "  %-4s %-14s %-46s %-10s %-10s %-19s %-19s %-17s\n" \
             "$((i + 1))" \
             "${WIZ_NAMES[$i]}" \
             "${display_addr}" \
             "${WIZ_USERS[$i]}" \
             "********" \
             "${display_mac}" \
+            "${display_data_mac}" \
             "${display_ip}"
     done
 
@@ -405,6 +429,7 @@ run_wizard() {
             WIZ_PASSES+=("$(prompt_bmc_pass)")
             WIZ_PORTS+=("$(prompt_bmc_port)")
             WIZ_MACS+=("$(prompt_boot_mac)")
+            WIZ_DATA_MACS+=("$(prompt_data_mac "${WIZ_MACS[$i]}")")
             WIZ_NODE_IPS+=("$(prompt_node_ip)")
         done
 
@@ -472,6 +497,9 @@ write_inventory() {
         local line="${WIZ_NAMES[$i]} bmc_address=${WIZ_IPS[$i]} bmc_user=${WIZ_USERS[$i]} bmc_pass=${WIZ_PASSES[$i]} bmc_port=${WIZ_PORTS[$i]}"
         if [[ -n "${WIZ_MACS[$i]}" ]]; then
             line+=" boot_mac=${WIZ_MACS[$i]}"
+        fi
+        if [[ -n "${WIZ_DATA_MACS[$i]}" ]]; then
+            line+=" data_mac=${WIZ_DATA_MACS[$i]}"
         fi
         if [[ -n "${WIZ_NODE_IPS[$i]}" ]]; then
             line+=" node_ip=${WIZ_NODE_IPS[$i]}"
@@ -555,6 +583,7 @@ declare -a WIZ_USERS=()
 declare -a WIZ_PASSES=()
 declare -a WIZ_PORTS=()
 declare -a WIZ_MACS=()
+declare -a WIZ_DATA_MACS=()
 declare -a WIZ_NODE_IPS=()
 WIZ_MACHINE_NETWORK=""
 WIZ_GATEWAY=""

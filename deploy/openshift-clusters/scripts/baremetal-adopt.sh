@@ -34,6 +34,7 @@ declare -a NODE_BMC_USERS=()
 declare -a NODE_BMC_PASSES=()
 declare -a NODE_BMC_PORTS=()
 declare -a NODE_BOOT_MACS=()
+declare -a NODE_DATA_MACS=()
 declare -a NODE_IPS=()
 
 # Cluster-wide network config (optional, from [baremetal_network])
@@ -157,7 +158,7 @@ parse_inventory() {
             name="${line%% *}"
             rest="${line#* }"
 
-            local bmc_address="" bmc_user="" bmc_pass="" bmc_port="" boot_mac="" node_ip=""
+            local bmc_address="" bmc_user="" bmc_pass="" bmc_port="" boot_mac="" node_ip="" data_mac=""
             for pair in ${rest}; do
                 local key val
                 key="${pair%%=*}"
@@ -169,6 +170,7 @@ parse_inventory() {
                     bmc_port)    bmc_port="${val}" ;;
                     boot_mac)    boot_mac="${val}" ;;
                     node_ip)     node_ip="${val}" ;;
+                    data_mac)    data_mac="${val}" ;;
                 esac
             done
 
@@ -182,6 +184,7 @@ parse_inventory() {
             NODE_BMC_PASSES+=("${bmc_pass}")
             NODE_BMC_PORTS+=("${bmc_port:-${BMC_PORT}}")
             NODE_BOOT_MACS+=("${boot_mac}")
+            NODE_DATA_MACS+=("${data_mac}")
             NODE_IPS+=("${node_ip}")
         fi
     done < "${INVENTORY}"
@@ -444,6 +447,20 @@ generate_baremetal_config() {
         done
         if ${all_have_ips} && [[ -n "${ip_list}" ]]; then
             echo "export BAREMETAL_IPS=\"${ip_list}\""
+        fi
+
+        # Emit BAREMETAL_MACS only if ANY node has data_mac set
+        local has_data_macs=false
+        local mac_list=""
+        for ((i = 0; i < ${#NODE_DATA_MACS[@]}; i++)); do
+            if [[ -n "${NODE_DATA_MACS[$i]}" ]]; then
+                has_data_macs=true
+            fi
+            [[ -n "${mac_list}" ]] && mac_list+=","
+            mac_list+="${NODE_DATA_MACS[$i]:-${NODE_BOOT_MACS[$i]}}"
+        done
+        if ${has_data_macs} && [[ -n "${mac_list}" ]]; then
+            echo "export BAREMETAL_MACS=\"${mac_list}\""
         fi
     } > "${output_file}"
 
