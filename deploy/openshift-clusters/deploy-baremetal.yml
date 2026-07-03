@@ -103,22 +103,16 @@
         [ -f "$f" ] || echo '{"auths":{}}' > "$f"
       changed_when: false
 
-    # --- Clean stale installer state from prior runs ---
-    - name: Remove stale installer state
+    # --- Clean prior deployment state ---
+    - name: Remove prior cluster state (required by dev-scripts verifyClean)
       ansible.builtin.file:
-        path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/{{ item }}"
+        path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}"
         state: absent
-      loop:
-        - .openshift_install_state.json
-        - .openshift_install.log
-        - agent.x86_64.iso
-        - cluster-manifests
-        - openshift
 
     # --- Deploy ---
     - name: Run dev-scripts ABI pipeline
       block:
-        - name: "dev-scripts: {{ item }}"
+        - name: Run dev-scripts make target
           make:
             chdir: "{{ dev_scripts_path }}"
             target: "{{ item }}"
@@ -129,6 +123,8 @@
             - agent_prepare_release
             - agent_configure
             - agent_create_cluster
+          loop_control:
+            label: "{{ item }}"
       rescue:
         - name: Display recovery instructions
           ansible.builtin.debug:
@@ -143,18 +139,13 @@
           ansible.builtin.fail:
             msg: "dev-scripts ABI pipeline failed"
 
-    # --- Post-deploy: fetch credentials to controller ---
-    - name: Fetch kubeconfig to controller
-      ansible.builtin.fetch:
-        src: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeconfig"
-        dest: "clusters/{{ test_cluster_name }}/auth/kubeconfig"
-        flat: true
-
-    - name: Fetch kubeadmin-password to controller
-      ansible.builtin.fetch:
-        src: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeadmin-password"
-        dest: "clusters/{{ test_cluster_name }}/auth/kubeadmin-password"
-        flat: true
+    # --- Post-deploy: proxy + credentials ---
+    - name: Setup proxy and fetch credentials
+      ansible.builtin.include_role:
+        name: proxy-setup
+      vars:
+        kubeconfig_path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeconfig"
+        kubeadmin_password_path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeadmin-password"
 
     - name: Fetch SSH private key to controller
       ansible.builtin.fetch:
@@ -167,6 +158,5 @@
       ansible.builtin.debug:
         msg: |
           Baremetal TNF cluster deployed successfully!
-          Kubeconfig: clusters/{{ test_cluster_name }}/auth/kubeconfig
-          Usage: export KUBECONFIG=$(pwd)/clusters/{{ test_cluster_name }}/auth/kubeconfig
-          SSH:   ssh -i clusters/{{ test_cluster_name }}/auth/id_ed25519 core@<node-ip>
+          Access: source proxy.env && oc get nodes
+          SSH:    ssh -i clusters/{{ test_cluster_name }}/auth/id_ed25519 core@<node-ip>
