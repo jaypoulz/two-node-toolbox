@@ -79,6 +79,8 @@ If you're using [Claude Code](https://claude.ai/code), use the `/setup` command 
 - Validating your setup
 
 Run `/setup` to begin, or `/setup <method>` to configure a specific deployment method (aws, external, kcli, dev-scripts).
+
+If you are not using Claude Code, or want a quick non-interactive check, run `make doctor` from the `deploy/` directory. It validates required tools, SSH keys, Ansible collections, and configuration files, printing a fix command for every problem found. `make doctor <cluster-type>` (for example `make doctor arbiter-ipi`) validates strictly for one deployment type.
 ## Helpers
 
 The [helpers/](helpers/) directory contains utilities for cluster operations including resource-agents patching, fencing validation, and containerized build validation. To quickly verify a resource-agents branch compiles on CentOS Stream 9 and 10:

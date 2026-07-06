@@ -73,6 +73,7 @@ fi
 # Check if instance data exists
 if [[ ! -f "$(get_node_dir)/aws-instance-id" ]]; then
     echo "Error: No instance found. Please run 'make deploy' first."
+    echo "Run 'make doctor' to check your setup."
     exit 1
 fi
 
@@ -81,6 +82,7 @@ if [[ ! -f "${DEPLOY_DIR}/openshift-clusters/inventory.ini" ]]; then
     echo "Error: inventory.ini not found in ${DEPLOY_DIR}/openshift-clusters/"
     echo "Please ensure the inventory file is properly configured."
     echo "You can run 'make inventory' to update it with current instance information."
+    echo "Run 'make doctor' to check your setup."
     exit 1
 fi
 

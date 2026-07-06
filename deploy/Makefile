@@ -13,6 +13,20 @@ ifeq (deploy,$(firstword $(MAKECMDGOALS)))
   endif
 endif
 
+# Handle 'make doctor <cluster-type>' pattern
+# When 'doctor' is first, following cluster types select strict validation for
+# that deployment; the cluster-type goals themselves are neutralized below so
+# they don't trigger an actual deployment.
+ifeq (doctor,$(firstword $(MAKECMDGOALS)))
+  DOCTOR_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ($(DOCTOR_ARGS),)
+    DOCTOR_INVALID_ARGS := $(filter-out $(VALID_CLUSTER_TYPES),$(DOCTOR_ARGS))
+    ifneq ($(DOCTOR_INVALID_ARGS),)
+      $(error Unknown cluster type: '$(DOCTOR_INVALID_ARGS)'. Run 'make help' for more information.)
+    endif
+  endif
+endif
+
 create:
 	@./aws-hypervisor/scripts/create.sh
 
@@ -69,6 +83,14 @@ baremetal-adopt baremetal-fencing-agent: sync-config
 sync-config:
 	@bash -c 'set -e; source ./common.sh; sync_config_files; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
 
+doctor:
+	@./openshift-clusters/scripts/doctor.sh $(DOCTOR_ARGS)
+
+ifeq (doctor,$(firstword $(MAKECMDGOALS)))
+# Cluster types after 'doctor' are arguments to doctor.sh, not deployments
+$(VALID_CLUSTER_TYPES):
+	@:
+else
 fencing-ipi:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology fencing --method ipi
 
@@ -96,6 +118,7 @@ fencing-kcli:
 fencing-assisted:
 	@$(MAKE) fencing-ipi
 	@./openshift-clusters/scripts/deploy-fencing-assisted.sh
+endif
 
 keep-instance:
 	@../helpers/keep-instance.sh '$(DAYS)'
@@ -135,6 +158,8 @@ help:
 	@echo "  ssh                  - SSH into the EC2 instance"
 	@echo "  info                 - Display instance information"
 	@echo "  inventory            - Update inventory.ini with current instance IP"
+	@echo "  doctor               - Validate configuration and prerequisites (read-only)"
+	@echo "  doctor <cluster-type>- Validate strictly for a specific cluster type"
 	@echo "  keep-instance        - Tag instance with keep-N retention (default: 2, max: 5)"
 	@echo "                         Usage: make keep-instance or make keep-instance DAYS=5"
 	@echo "  sync-config          - Sync files from config/ to their canonical locations"

@@ -38,6 +38,8 @@ make patch-nodes        # Build resource-agents RPM and patch cluster nodes
 make ssh               # SSH into EC2 instance
 make info              # Display instance information
 make inventory         # Update inventory.ini with current instance IP
+make doctor            # Validate configuration and prerequisites (read-only)
+make doctor <type>     # Validate strictly for a specific cluster type (e.g. fencing-kcli)
 ```
 
 ### Ansible Deployment Methods
