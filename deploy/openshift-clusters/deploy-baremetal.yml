@@ -17,9 +17,6 @@
     method: agent
     topology: fencing
     test_cluster_name: ostest
-    dev_scripts_path: openshift-metal3/dev-scripts
-    dev_scripts_src_repo: https://github.com/openshift-metal3/dev-scripts
-    dev_scripts_branch: master
 
   pre_tasks:
     - name: Check adoption artifacts exist on controller
@@ -50,9 +47,9 @@
     # --- Git checkout (must precede config role — creates dev_scripts_path) ---
     - name: Checkout dev-scripts
       ansible.builtin.git:
-        dest: "{{ dev_scripts_path }}"
-        repo: "{{ dev_scripts_src_repo }}"
-        version: "{{ dev_scripts_branch }}"
+        dest: "{{ dev_scripts_path | default('openshift-metal3/dev-scripts') }}"
+        repo: "{{ dev_scripts_src_repo | default('https://github.com/openshift-metal3/dev-scripts') }}"
+        version: "{{ dev_scripts_branch | default('master') }}"
 
     # --- Validation, config deploy, pull-secret (reused from install-dev role) ---
     - name: Validate and deploy config + pull-secret
