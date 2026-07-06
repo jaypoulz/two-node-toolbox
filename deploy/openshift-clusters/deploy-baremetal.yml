@@ -43,6 +43,10 @@
         label: "{{ item.item }}"
 
   tasks:
+    - name: Setup git identity on provisioning host
+      ansible.builtin.include_role:
+        name: git-user
+
     # --- Git checkout (must precede config role — creates dev_scripts_path) ---
     - name: Checkout dev-scripts
       ansible.builtin.git:
