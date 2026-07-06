@@ -11,7 +11,7 @@
 # Each node requires:
 #   bmc_address - BMC/iDRAC/iLO management address (IP or hostname)
 #   bmc_user   - BMC login username
-#   bmc_pass   - BMC login password
+#   bmc_pass   - BMC login password (must not contain spaces or #)
 #   bmc_port   - (optional) BMC Redfish port (default: 443)
 #   boot_mac   - (optional) MAC address of the NIC used for PXE boot
 #                If omitted, the adopt script attempts Redfish discovery.

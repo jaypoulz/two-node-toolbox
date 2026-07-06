@@ -342,7 +342,10 @@ generate_ironic_nodes_json() {
             system_id="redfish/v1/Systems/1"
         else
             system_id=$(discover_redfish_system_id "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_port}" 2>/dev/null) || true
-            system_id="${system_id:-/redfish/v1/Systems/1}"
+            if [[ -z "${system_id}" ]]; then
+                echo "  WARNING: ${name}: Redfish system discovery failed, using default /redfish/v1/Systems/1" >&2
+                system_id="/redfish/v1/Systems/1"
+            fi
             system_id="${system_id#/}"
             system_id="${system_id%/}"
         fi
@@ -467,6 +470,10 @@ generate_baremetal_config() {
 main() {
     parse_args "$@"
 
+    if ${SKIP_VERIFY} && ${VERIFY_ONLY}; then
+        die "--skip-verify and --verify-only are mutually exclusive"
+    fi
+
     # Launch interactive wizard if no inventory exists
     if [[ ! -f "${INVENTORY}" ]]; then
         info "No inventory found at ${INVENTORY}"
@@ -475,6 +482,12 @@ main() {
     fi
 
     parse_inventory
+
+    # Validate required fields before expensive BMC calls
+    for ((i = 0; i < ${#NODE_NAMES[@]}; i++)); do
+        [[ -z "${NODE_DATA_MACS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': data_mac is required"
+        [[ -z "${NODE_IPS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': node_ip is required"
+    done
 
     # BMC verification
     if ! ${SKIP_VERIFY}; then

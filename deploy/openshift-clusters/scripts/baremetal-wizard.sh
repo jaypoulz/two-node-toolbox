@@ -408,7 +408,9 @@ run_wizard() {
         WIZ_IPS=()
         WIZ_USERS=()
         WIZ_PASSES=()
+        WIZ_PORTS=()
         WIZ_MACS=()
+        WIZ_DATA_MACS=()
         WIZ_NODE_IPS=()
 
         local i
@@ -449,24 +451,29 @@ run_wizard() {
 
         show_summary
 
-        local confirm
-        read -rp "Proceed with this configuration? [Y/n/q]: " confirm
-        confirm="${confirm:-Y}"
+        while true; do
+            local confirm
+            read -rp "Proceed with this configuration? [Y/n/q]: " confirm
+            confirm="${confirm:-Y}"
 
-        case "${confirm}" in
-            [Yy]|[Yy]es)
-                break
-                ;;
-            [Qq]|[Qq]uit)
-                die "Wizard cancelled by user"
-                ;;
-            *)
-                echo ""
-                info "Starting over — re-enter node information"
-                echo ""
-                continue
-                ;;
-        esac
+            case "${confirm}" in
+                [Yy]|[Yy]es)
+                    break 2
+                    ;;
+                [Nn]|[Nn]o)
+                    echo ""
+                    info "Starting over — re-enter node information"
+                    echo ""
+                    break
+                    ;;
+                [Qq]|[Qq]uit)
+                    die "Wizard cancelled by user"
+                    ;;
+                *)
+                    echo "  Please enter Y, n, or q" >&2
+                    ;;
+            esac
+        done
     done
 
     write_inventory
