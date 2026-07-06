@@ -333,13 +333,13 @@ prompt_ssh_key() {
 prompt_dev_scripts_path() {
     local path
     read -rp "  dev-scripts path on remote [~/openshift-metal3/dev-scripts]: " path
-    echo "${path}"
+    echo "${path:-~/openshift-metal3/dev-scripts}"
 }
 
 prompt_working_dir() {
     local dir
     read -rp "  Remote working directory [~/tnt-baremetal]: " dir
-    echo "${dir}"
+    echo "${dir:-~/tnt-baremetal}"
 }
 
 ##############################################################################
@@ -530,15 +530,19 @@ write_inventory() {
         echo ""
         echo "[provisioning_host]"
         if [[ -n "${WIZ_SSH_TARGET}" ]]; then
-            echo "ssh_target=${WIZ_SSH_TARGET}"
+            local prov_user="${WIZ_SSH_TARGET%%@*}"
+            local prov_host="${WIZ_SSH_TARGET#*@}"
+            local host_line="${prov_host} ansible_user=${prov_user}"
+            if [[ -n "${WIZ_SSH_KEY}" ]]; then
+                host_line+=" ansible_ssh_private_key_file=${WIZ_SSH_KEY}"
+            fi
+            echo "${host_line}"
         else
-            echo "#ssh_target="
+            echo "#host ansible_user=root"
         fi
-        if [[ -n "${WIZ_SSH_KEY}" ]]; then
-            echo "ssh_key=${WIZ_SSH_KEY}"
-        else
-            echo "#ssh_key="
-        fi
+
+        echo ""
+        echo "[provisioning_host:vars]"
         if [[ -n "${WIZ_DEV_SCRIPTS_PATH}" ]]; then
             echo "dev_scripts_path=${WIZ_DEV_SCRIPTS_PATH}"
         else
