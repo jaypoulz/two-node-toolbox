@@ -1,0 +1,64 @@
+# Baremetal node inventory for TNF adoption
+#
+# NOTE: This is separate from inventory.ini, which targets the hypervisor host.
+# This file describes the physical baremetal nodes to be adopted as OpenShift nodes.
+#   inventory.ini           → hypervisor (where dev-scripts runs)
+#   inventory_baremetal.ini → baremetal nodes (BMC endpoints for adoption)
+#
+# Copy this file to inventory_baremetal.ini and fill in your node details.
+# Then run: make baremetal-adopt
+#
+# Each node requires:
+#   bmc_address - BMC/iDRAC/iLO management address (IP or hostname)
+#   bmc_user   - BMC login username
+#   bmc_pass   - BMC login password (must not contain spaces or #)
+#   bmc_port   - (optional) BMC Redfish port (default: 443)
+#   boot_mac   - (optional) MAC address of the NIC used for PXE boot
+#                If omitted, the adopt script attempts Redfish discovery.
+#   data_mac   - MAC address of the data NIC (for agent-config hostname mapping)
+#                May differ from boot_mac on multi-NIC servers. Emitted as BAREMETAL_MACS.
+#   node_ip    - Static IP address for this node on the machine network
+#
+# The hostname (first field) becomes the node name in ironic_nodes.json.
+# For TNF, you need exactly 2 nodes (master-0 and master-1).
+
+[baremetal_nodes]
+master-0 bmc_address=192.168.1.100 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:01 data_mac=52:54:00:00:00:01 node_ip=192.168.1.10
+master-1 bmc_address=192.168.1.101 bmc_user=admin bmc_pass=changeme boot_mac=52:54:00:00:00:02 data_mac=52:54:00:00:00:02 node_ip=192.168.1.11
+
+[baremetal_nodes:vars]
+# BMC driver — only redfish is supported for TNF fencing
+bmc_driver=redfish
+
+# BMC Redfish port (per-node bmc_port overrides this)
+bmc_port=443
+
+# Skip TLS verification for BMC endpoints (common with self-signed certs)
+bmc_verify_ca=False
+
+# Node CPU architecture
+cpu_arch=x86_64
+
+[baremetal_network]
+# Cluster-wide network config for baremetal deploy.
+# api_vip         - API virtual IP (required)
+# ingress_vip     - (optional) Ingress virtual IP — defaults to api_vip if omitted
+# machine_network - (optional) Machine network CIDR (e.g. 192.168.1.0/24)
+# iso_url         - Full HTTP URL for agent ISO VirtualMedia boot (required)
+#                   Must be reachable from BMCs. dev-scripts stages the ISO at
+#                   ${WORKING_DIR}/${CLUSTER_NAME}/agent.x86_64.iso on the provisioning host.
+api_vip=192.168.1.100
+#ingress_vip=192.168.1.101
+#machine_network=192.168.1.0/24
+iso_url=http://10.1.235.49:8080/dev-scripts/ostest/agent.x86_64.iso
+
+[provisioning_host]
+# Remote host where dev-scripts runs (all optional).
+# ssh_target       - user@host for SSH access to the provisioning machine
+# ssh_key          - Path to SSH private key (omit to use ssh-agent/default)
+# dev_scripts_path - dev-scripts checkout on the remote host
+# working_dir      - Working directory on the remote host for adoption artifacts
+#ssh_target=root@hypervisor.example.com
+#ssh_key=~/.ssh/id_ed25519
+#dev_scripts_path=~/openshift-metal3/dev-scripts
+#working_dir=~/tnt-baremetal

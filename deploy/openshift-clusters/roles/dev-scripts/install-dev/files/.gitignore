@@ -4,3 +4,5 @@ clusterbot-ci_token
 config_arbiter.sh
 config_fencing.sh
 config_sno.sh
+config_baremetal_fencing.sh
+ironic_nodes.json

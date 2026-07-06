@@ -1,4 +1,6 @@
 inventory.ini
+inventory_baremetal.ini
+
 proxy.env
 kubeconfig
 kubeadmin-password
