@@ -17,7 +17,9 @@
     method: agent
     topology: fencing
     test_cluster_name: ostest
-    dev_scripts_path: "{{ dev_scripts_path | default('openshift-metal3/dev-scripts') }}"
+    dev_scripts_path: openshift-metal3/dev-scripts
+    dev_scripts_src_repo: https://github.com/openshift-metal3/dev-scripts
+    dev_scripts_branch: master
 
   pre_tasks:
     - name: Check adoption artifacts exist on controller
@@ -41,13 +43,14 @@
         label: "{{ item.item }}"
 
   tasks:
-    # --- Validation, config deploy, pull-secret (reused from install-dev role) ---
-    - name: Ensure dev-scripts directory exists
-      ansible.builtin.file:
-        path: "{{ dev_scripts_path }}"
-        state: directory
-        mode: "0755"
+    # --- Git checkout (must precede config role — creates dev_scripts_path) ---
+    - name: Checkout dev-scripts
+      ansible.builtin.git:
+        dest: "{{ dev_scripts_path }}"
+        repo: "{{ dev_scripts_src_repo }}"
+        version: "{{ dev_scripts_branch }}"
 
+    # --- Validation, config deploy, pull-secret (reused from install-dev role) ---
     - name: Validate and deploy config + pull-secret
       ansible.builtin.include_role:
         name: dev-scripts/install-dev
@@ -57,13 +60,6 @@
         config_file:
           agent: config_baremetal_fencing.sh
         install_host_deps: false
-
-    # --- Git checkout ---
-    - name: Checkout dev-scripts
-      ansible.builtin.git:
-        dest: "{{ dev_scripts_path }}"
-        repo: "{{ dev_scripts_src_repo }}"
-        version: "{{ dev_scripts_branch }}"
 
     # --- Baremetal-specific setup ---
     - name: Copy ironic_nodes.json to dev-scripts
