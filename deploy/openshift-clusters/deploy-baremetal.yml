@@ -109,6 +109,17 @@
         path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}"
         state: absent
 
+    # --- Cluster state: deploying ---
+    - name: Set cluster state to deploying
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: cluster-state
+      vars:
+        cluster_state_dir: "{{ playbook_dir }}/clusters/{{ test_cluster_name }}"
+        cluster_state_filename: cluster-state.json
+        cluster_state_phase: deploying
+        default_playbook_name: deploy-baremetal.yml
+
     # --- Deploy ---
     - name: Run dev-scripts ABI pipeline
       block:
@@ -138,6 +149,17 @@
         - name: Fail after displaying recovery steps
           ansible.builtin.fail:
             msg: "dev-scripts ABI pipeline failed"
+
+    # --- Cluster state: deployed ---
+    - name: Set cluster state to deployed
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: cluster-state
+      vars:
+        cluster_state_dir: "{{ playbook_dir }}/clusters/{{ test_cluster_name }}"
+        cluster_state_filename: cluster-state.json
+        cluster_state_phase: deployed
+        default_playbook_name: deploy-baremetal.yml
 
     # --- Post-deploy: proxy + credentials ---
     - name: Setup proxy and fetch credentials
