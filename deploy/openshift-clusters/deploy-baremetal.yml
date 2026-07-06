@@ -40,6 +40,12 @@
         label: "{{ item.item }}"
 
   tasks:
+    - name: Resolve dev-scripts defaults
+      ansible.builtin.set_fact:
+        dev_scripts_path: "{{ dev_scripts_path | default('openshift-metal3/dev-scripts') }}"
+        dev_scripts_src_repo: "{{ dev_scripts_src_repo | default('https://github.com/openshift-metal3/dev-scripts') }}"
+        dev_scripts_branch: "{{ dev_scripts_branch | default('master') }}"
+
     - name: Setup git identity on provisioning host
       ansible.builtin.include_role:
         name: git-user
@@ -47,9 +53,9 @@
     # --- Git checkout (must precede config role — creates dev_scripts_path) ---
     - name: Checkout dev-scripts
       ansible.builtin.git:
-        dest: "{{ dev_scripts_path | default('openshift-metal3/dev-scripts') }}"
-        repo: "{{ dev_scripts_src_repo | default('https://github.com/openshift-metal3/dev-scripts') }}"
-        version: "{{ dev_scripts_branch | default('master') }}"
+        dest: "{{ dev_scripts_path }}"
+        repo: "{{ dev_scripts_src_repo }}"
+        version: "{{ dev_scripts_branch }}"
 
     # --- Validation, config deploy, pull-secret (reused from install-dev role) ---
     - name: Validate and deploy config + pull-secret
