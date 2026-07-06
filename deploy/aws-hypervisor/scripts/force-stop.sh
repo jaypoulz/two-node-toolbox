@@ -39,7 +39,7 @@ wait_for_instance_stopped() {
     done
     
     echo "Warning: Instance may not have stopped cleanly after ${FORCE_STOP_WAIT_RETRIES} attempts"
-    echo "Check instance status with: make info"
+    echo "Check instance status with: make status"
     return 1
 }
 

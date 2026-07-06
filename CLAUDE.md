@@ -36,7 +36,7 @@ make patch-nodes        # Build resource-agents RPM and patch cluster nodes
 
 # Utilities
 make ssh               # SSH into EC2 instance
-make info              # Display instance information
+make status            # Show status dashboard (instance, cluster VMs, proxy, cluster API); 'make info' is an alias
 make inventory         # Update inventory.ini with current instance IP
 make doctor            # Validate configuration and prerequisites (read-only)
 make doctor <type>     # Validate strictly for a specific cluster type (e.g. fencing-kcli)

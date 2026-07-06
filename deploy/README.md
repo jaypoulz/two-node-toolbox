@@ -90,8 +90,8 @@ $ make inventory
 # SSH into the EC2 instance
 $ make ssh
 
-# Get instance info
-$ make info
+# Show status dashboard (instance, cluster VMs, proxy, cluster API)
+$ make status   # 'make info' is an alias
 
 # Start a stopped instance
 $ make start
@@ -273,6 +273,13 @@ $ make get-tnf-logs
 ```
 
 ## Troubleshooting Cluster Management
+
+Start with the status dashboard when access breaks. It reports local configuration,
+EC2 instance state, cluster VM states, proxy container health, and cluster API
+reachability in one pass, degrading gracefully when parts are unreachable:
+```bash
+$ make status
+```
 
 If cluster startup fails:
 ```bash

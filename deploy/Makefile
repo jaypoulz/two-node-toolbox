@@ -69,8 +69,11 @@ clean-spoke:
 ssh:
 	@./aws-hypervisor/scripts/ssh.sh
 
-info:
-	@./aws-hypervisor/scripts/print_instance_data.sh
+status:
+	@./openshift-clusters/scripts/status.sh
+
+# Alias kept for muscle memory: 'make info' output is part of 'make status'
+info: status
 
 inventory:
 	@./aws-hypervisor/scripts/inventory.sh
@@ -156,7 +159,8 @@ help:
 	@echo ""
 	@echo "Instance Utils:"
 	@echo "  ssh                  - SSH into the EC2 instance"
-	@echo "  info                 - Display instance information"
+	@echo "  status               - Show status dashboard (instance, cluster VMs, proxy, cluster API)"
+	@echo "  info                 - Alias for status"
 	@echo "  inventory            - Update inventory.ini with current instance IP"
 	@echo "  doctor               - Validate configuration and prerequisites (read-only)"
 	@echo "  doctor <cluster-type>- Validate strictly for a specific cluster type"
