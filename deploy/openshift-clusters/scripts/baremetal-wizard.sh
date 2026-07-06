@@ -37,6 +37,7 @@ parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --output)
+                [[ $# -lt 2 ]] && die "--output requires an argument"
                 OUTPUT="$2"
                 shift 2
                 ;;

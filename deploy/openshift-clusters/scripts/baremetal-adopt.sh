@@ -72,10 +72,12 @@ parse_args() {
                 shift
                 ;;
             --inventory)
+                [[ $# -lt 2 ]] && die "--inventory requires an argument"
                 INVENTORY="$2"
                 shift 2
                 ;;
             --config-base)
+                [[ $# -lt 2 ]] && die "--config-base requires an argument"
                 CONFIG_BASE="$2"
                 shift 2
                 ;;
