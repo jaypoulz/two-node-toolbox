@@ -17,6 +17,7 @@
     method: agent
     topology: fencing
     test_cluster_name: ostest
+    dev_scripts_path: "{{ dev_scripts_path | default('openshift-metal3/dev-scripts') }}"
 
   pre_tasks:
     - name: Check adoption artifacts exist on controller
