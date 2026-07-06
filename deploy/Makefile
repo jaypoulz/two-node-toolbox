@@ -98,6 +98,9 @@ baremetal-adopt:
 baremetal-verify:
 	@./openshift-clusters/scripts/baremetal-adopt.sh --verify-only
 
+baremetal-fencing-agent:
+	@./openshift-clusters/scripts/deploy-baremetal.sh
+
 baremetal-wizard:
 	@./openshift-clusters/scripts/baremetal-wizard.sh
 
@@ -148,9 +151,10 @@ help:
 	@echo "  patch-nodes          - Build resource-agents RPM and patch cluster nodes (default version: 4.11)"
 	@echo ""
 	@echo "Baremetal Adoption:"
-	@echo "  baremetal-adopt      - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
-	@echo "  baremetal-verify     - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
-	@echo "  baremetal-wizard     - Interactive wizard to create baremetal node inventory"
+	@echo "  baremetal-adopt           - Adopt baremetal nodes: validate BMC + generate dev-scripts artifacts"
+	@echo "  baremetal-fencing-agent   - Deploy TNF cluster on adopted baremetal nodes via provisioning host"
+	@echo "  baremetal-verify          - Verify BMC credentials for adopted baremetal nodes (no artifacts)"
+	@echo "  baremetal-wizard          - Interactive wizard to create baremetal node inventory"
 	@echo ""
 	@echo "Cluster Utilities:"
 	@echo "  get-tnf-logs         - Collect pacemaker and etcd logs from cluster nodes"

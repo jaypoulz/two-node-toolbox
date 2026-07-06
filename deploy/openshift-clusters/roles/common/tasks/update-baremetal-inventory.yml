@@ -1,0 +1,145 @@
+---
+# Update inventory_baremetal.ini with cluster nodes for direct Ansible access.
+# Baremetal variant of update-cluster-inventory.yml — node IPs are already
+# known from [baremetal_nodes], so no virsh discovery is needed.
+
+- name: Build node entries from baremetal_nodes group
+  set_fact:
+    node_entries_raw: >-
+      [{% for host in groups['baremetal_nodes'] %}
+      {"name": "{{ host }}", "ip": "{{ hostvars[host]['node_ip'] }}"}{% if not loop.last %},{% endif %}
+      {% endfor %}]
+
+- name: Parse node entries
+  set_fact:
+    parsed_vm_entries: "{{ node_entries_raw | from_json }}"
+
+- name: Fail if any node is missing node_ip
+  fail:
+    msg: "Node {{ item.name }} is missing node_ip in inventory"
+  when: item.ip | length == 0
+  loop: "{{ parsed_vm_entries }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Get provisioning host connection info
+  set_fact:
+    provisioning_host_addr: "{{ hostvars[inventory_hostname]['ansible_host'] | default(inventory_hostname.split('@')[1] if '@' in inventory_hostname else inventory_hostname) }}"
+    provisioning_host_user: "{{ hostvars[inventory_hostname]['ansible_user'] | default(inventory_hostname.split('@')[0] if '@' in inventory_hostname else 'root') }}"
+
+- name: Detect SSH private key being used by Ansible
+  delegate_to: localhost
+  become: false
+  shell: |
+    if [ -n "$SSH_AUTH_SOCK" ]; then
+      KEY=$(ssh-add -L 2>/dev/null | grep -v "^The agent has no identities" | head -n1)
+      if [ -n "$KEY" ]; then
+        echo "$KEY"
+        exit 0
+      fi
+    fi
+    for key in id_ed25519 id_rsa id_ecdsa; do
+      if [ -f "$HOME/.ssh/$key.pub" ]; then
+        cat "$HOME/.ssh/$key.pub"
+        exit 0
+      fi
+    done
+    exit 1
+  register: detected_ssh_key
+  failed_when: false
+  changed_when: false
+
+- name: Read local user's SSH public key
+  delegate_to: localhost
+  become: false
+  set_fact:
+    local_ssh_pubkey_content: "{{ detected_ssh_key.stdout | trim }}"
+  when: detected_ssh_key.rc == 0
+
+- name: Validate SSH public key format
+  delegate_to: localhost
+  become: false
+  set_fact:
+    ssh_key_valid: "{{ local_ssh_pubkey_content is defined and local_ssh_pubkey_content is match('^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|ssh-dss) ') }}"
+
+- name: Warn if no valid SSH key found
+  debug:
+    msg: |
+      WARNING: No valid SSH public key detected on the local machine.
+      ProxyJump SSH access to cluster nodes will not work.
+      Ensure you have an SSH key pair in ~/.ssh/ (id_ed25519, id_rsa, etc.)
+  when: not (ssh_key_valid | default(false))
+
+- name: Add local user's SSH key to cluster nodes
+  loop: "{{ parsed_vm_entries }}"
+  when: ssh_key_valid | default(false)
+  shell: |
+    set -e
+    NODE_IP="{{ item.ip }}"
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 "core@${NODE_IP}" \
+      "echo '{{ local_ssh_pubkey_content }}' >> ~/.ssh/authorized_keys && sort -u ~/.ssh/authorized_keys -o ~/.ssh/authorized_keys"
+  register: ssh_key_propagation
+  changed_when: false
+  retries: 3
+  delay: 5
+  until: ssh_key_propagation.rc == 0
+
+- name: Display SSH key propagation results
+  debug:
+    msg: "SSH key added to {{ item.item.name }} ({{ item.item.ip }})"
+  loop: "{{ ssh_key_propagation.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: ssh_key_propagation is defined
+
+- name: Update inventory file with cluster nodes
+  delegate_to: localhost
+  become: false
+  run_once: true
+  block:
+    - name: Read current inventory file
+      slurp:
+        src: "{{ playbook_dir }}/inventory_baremetal.ini"
+      register: current_inventory
+
+    - name: Parse current inventory content
+      set_fact:
+        inventory_content: "{{ current_inventory.content | b64decode }}"
+
+    - name: Remove old cluster_nodes section if exists
+      set_fact:
+        temp_inventory: "{{ inventory_content | regex_replace('(?s)\\n\\[cluster_nodes\\](.*?)(?=\\n\\[|\\Z)', '', multiline=True) }}"
+
+    - name: Remove old cluster_nodes:vars section if exists
+      set_fact:
+        cleaned_inventory: "{{ temp_inventory | regex_replace('(?s)\\n\\[cluster_nodes:vars\\](.*?)(?=\\n\\[|\\Z)', '', multiline=True) }}"
+
+    - name: Build cluster_nodes section
+      set_fact:
+        cluster_nodes_section: |
+          [cluster_nodes]
+          {% for entry in parsed_vm_entries %}
+          {{ entry.name }} ansible_host='{{ entry.ip }}'
+          {% endfor %}
+
+          [cluster_nodes:vars]
+          ansible_ssh_common_args="-o ProxyJump={{ provisioning_host_user }}@{{ provisioning_host_addr }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ansible_user=core
+
+    - name: Write updated inventory
+      copy:
+        content: "{{ cleaned_inventory.rstrip() }}\n{{ cluster_nodes_section }}"
+        dest: "{{ playbook_dir }}/inventory_baremetal.ini"
+        backup: yes
+
+    - name: Display inventory update success
+      debug:
+        msg: |
+          Inventory updated with {{ parsed_vm_entries | length }} cluster node(s):
+          {% for entry in parsed_vm_entries %}
+          - {{ entry.name }}: {{ entry.ip }}
+          {% endfor %}
+
+          Nodes are accessible via ProxyJump through {{ provisioning_host_user }}@{{ provisioning_host_addr }}
+
+          Test: ansible -i inventory_baremetal.ini -m ping cluster_nodes

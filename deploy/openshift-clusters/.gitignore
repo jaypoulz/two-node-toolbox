@@ -4,6 +4,7 @@ inventory_baremetal.ini
 proxy.env
 kubeconfig
 kubeadmin-password
+clusters/
 *.pyc
 *.pyo
 

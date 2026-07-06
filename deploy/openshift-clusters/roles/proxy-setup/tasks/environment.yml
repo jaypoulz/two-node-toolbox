@@ -7,7 +7,7 @@
       # Determine the directory where this proxy.env file is located
       PROXY_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-      export EC2_PUBLIC_IP={{ hostvars[inventory_hostname]['inventory_hostname'].split('@')[1] }}
+      export EC2_PUBLIC_IP={{ hostvars[inventory_hostname]['ansible_host'] | default(inventory_hostname.split('@')[1] if '@' in inventory_hostname else inventory_hostname) }}
       export PROXYPORT={{ proxy_port }}
       export HTTP_PROXY=http://${EC2_PUBLIC_IP}:${PROXYPORT}/
       export HTTPS_PROXY=http://${EC2_PUBLIC_IP}:${PROXYPORT}/

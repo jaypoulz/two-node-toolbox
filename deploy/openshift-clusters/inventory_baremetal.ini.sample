@@ -40,25 +40,40 @@ bmc_verify_ca=False
 cpu_arch=x86_64
 
 [baremetal_network]
-# Cluster-wide network config for baremetal deploy.
+# Cluster-wide network config for baremetal ABI deployments.
 # api_vip         - API virtual IP (required)
-# ingress_vip     - (optional) Ingress virtual IP — defaults to api_vip if omitted
-# machine_network - (optional) Machine network CIDR (e.g. 192.168.1.0/24)
+# ingress_vip     - Ingress virtual IP (optional, defaults to api_vip)
+# machine_network - Machine network CIDR (e.g. 192.168.1.0/24)
+# gateway         - Default gateway IP
+# dns_servers     - Comma-separated DNS server IPs reachable from the nodes.
+#                   Used as the node DNS resolver during install (resolves quay.io, etc.).
+#                   If unset, falls back to gateway — which may not run DNS.
 # iso_url         - Full HTTP URL for agent ISO VirtualMedia boot (required)
 #                   Must be reachable from BMCs. dev-scripts stages the ISO at
 #                   ${WORKING_DIR}/${CLUSTER_NAME}/agent.x86_64.iso on the provisioning host.
 api_vip=192.168.1.100
 #ingress_vip=192.168.1.101
 #machine_network=192.168.1.0/24
+#gateway=192.168.1.1
+#dns_servers=10.11.5.160,10.2.32.85
 iso_url=http://10.1.235.49:8080/dev-scripts/ostest/agent.x86_64.iso
 
 [provisioning_host]
-# Remote host where dev-scripts runs (all optional).
-# ssh_target       - user@host for SSH access to the provisioning machine
-# ssh_key          - Path to SSH private key (omit to use ssh-agent/default)
-# dev_scripts_path - dev-scripts checkout on the remote host
-# working_dir      - Working directory on the remote host for adoption artifacts
-#ssh_target=root@hypervisor.example.com
-#ssh_key=~/.ssh/id_ed25519
+# Provisioning host for baremetal ABI deployment. Must be on the same L2 network
+# as the baremetal nodes (serves agent ISO via HTTP, runs dnsmasq, acts as gateway).
+#
+# Standard Ansible inventory format — one host entry with connection variables.
+# For local deployment, use: localhost ansible_connection=local
+#
+#10.1.155.50 ansible_user=root ansible_ssh_private_key_file=~/.ssh/lab_key
+
+[provisioning_host:vars]
+# Override dev-scripts checkout on the provisioning host (optional).
+# Defaults come from roles/dev-scripts/install-dev/defaults/main.yml:
+#   dev_scripts_path=openshift-metal3/dev-scripts
+#   dev_scripts_src_repo=https://github.com/openshift-metal3/dev-scripts
+#   dev_scripts_branch=master
+#
 #dev_scripts_path=~/openshift-metal3/dev-scripts
-#working_dir=~/tnt-baremetal
+#dev_scripts_src_repo=https://github.com/myuser/dev-scripts
+#dev_scripts_branch=my-feature-branch
