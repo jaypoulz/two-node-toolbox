@@ -147,6 +147,10 @@
         kubeconfig_path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeconfig"
         kubeadmin_password_path: "{{ dev_scripts_path }}/ocp/{{ test_cluster_name }}/auth/kubeadmin-password"
 
+    - name: Update inventory with cluster nodes
+      ansible.builtin.include_tasks:
+        file: roles/common/tasks/update-baremetal-inventory.yml
+
     - name: Fetch SSH private key to controller
       ansible.builtin.fetch:
         src: ~/.ssh/id_ed25519
