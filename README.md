@@ -6,6 +6,8 @@ This repository provides automation for deploying and managing two-node OpenShif
 
 ## Quick Start
 
+Configuration files (instance settings, pull secret, topology configs) are created in the central [config/](config/) folder; see [config/README.md](config/README.md) for the full list. Every `make` command syncs them to the locations where the automation reads them. Editing the canonical locations directly still works as before.
+
 ### Option 1: AWS Hypervisor (Automated)
 
 If you have AWS access, use the automated workflow. Most lifecycle operations can be performed from the [deploy](deploy/) folder using `make`:
@@ -47,6 +49,8 @@ ansible-playbook init-host.yml -i inventory.ini
 ansible-playbook setup.yml -i inventory.ini        # dev-scripts (arbiter or fencing)
 ansible-playbook kcli-install.yml -i inventory.ini # kcli (fencing only)
 ```
+
+If you created your configuration files in [config/](config/), run `make sync-config` from the [deploy/](deploy/) folder first to distribute them, since the playbooks are invoked directly here.
 
 See [deploy/openshift-clusters/README-external-host.md](deploy/openshift-clusters/README-external-host.md) for detailed instructions.
 

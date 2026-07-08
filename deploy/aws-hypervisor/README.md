@@ -5,12 +5,15 @@ This directory contains scripts for managing EC2 instances used as hypervisors f
 ## Configuration
 
 ### Environment Setup
-Copy the `instance.env.template` file to `instance.env` and set all variables to valid values for your user.
+Copy the `config/instance.env.template` file at the repository root to `config/instance.env` and set all variables to valid values for your user. Every `make` target syncs it to `instance.env` in this directory, where the scripts read it.
 
 ```bash
-cp instance.env.template instance.env
-# Edit instance.env with your specific values
+# From the repository root
+cp config/instance.env.template config/instance.env
+# Edit config/instance.env with your specific values
 ```
+
+Editing `instance.env` in this directory directly still works as before.
 
 #### Automated RHSM Registration (Hands-off Deployment)
 For a completely automated deployment without manual intervention, you can configure Red Hat Subscription Manager (RHSM) activation key variables in your `instance.env` file:
@@ -143,7 +146,7 @@ if [ "$(uname -m)" = "aarch64" ]; then
 fi
 ```
 
-See `config_fencing_example.sh` for a complete example. To rebuild these images, use `helpers/build-metal3-arm64.sh` (see [helpers/README.md](../../helpers/README.md)).
+See `config/config_fencing_example.sh` at the repository root for a complete example. To rebuild these images, use `helpers/build-metal3-arm64.sh` (see [helpers/README.md](../../helpers/README.md)).
 
 ### Known Limitations
 

@@ -37,7 +37,7 @@ All deployment methods require an SSH key on the local machine. Check for any of
 
 If no SSH key exists, create one with: `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519`
 
-**Note for non-default key paths:** Set `SSH_PUBLIC_KEY` in [deploy/aws-hypervisor/instance.env](deploy/aws-hypervisor/instance.env). This is used by both the AWS hypervisor and dev-scripts deployments.
+**Note for non-default key paths:** Set `SSH_PUBLIC_KEY` in [config/instance.env](config/instance.env). This is used by both the AWS hypervisor and dev-scripts deployments.
 
 ### Inventory File
 
@@ -60,22 +60,19 @@ Required for: external, kcli, dev-scripts
 
 Required for: kcli, dev-scripts
 
-The same pull secret is used by both kcli and dev-scripts (stored in different locations).
-
-- kcli location: [deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json](deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json)
-- dev-scripts location: [deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json)
+The same pull secret is used by both kcli and dev-scripts. Create it once in the central config folder: [config/pull-secret.json](config/pull-secret.json). The sync (run by every `make` target, or explicitly via `cd deploy && make sync-config`) distributes it to both role locations automatically.
 
 **Setup logic:**
-- Check if file exists in either location
-- If it exists in one location, offer to copy it to the other
+- Check if [config/pull-secret.json](config/pull-secret.json) exists
+- If not, check the canonical locations (`deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json` and `deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json`) - a file there means the user configured it the direct-edit way, which is still valid
 - If it doesn't exist anywhere:
   - User gets pull secret from: https://cloud.redhat.com/openshift/install/pull-secret
   - **For CI builds**: Must include `registry.ci.openshift.org` access (see [CI Token](#ci-token) below)
-  - Suggest creating file and pasting content
+  - Suggest creating [config/pull-secret.json](config/pull-secret.json) and pasting content
 
 **Validation:**
-- Validate pull secret is valid JSON: `jq . < <path-to-pull-secret>`
-- Check for CI registry access (if needed): `jq '.auths | has("registry.ci.openshift.org")' < <path-to-pull-secret>`
+- Validate pull secret is valid JSON: `jq . < config/pull-secret.json`
+- Check for CI registry access (if needed): `jq '.auths | has("registry.ci.openshift.org")' < config/pull-secret.json`
 
 ### CI Token
 
@@ -107,10 +104,11 @@ Required for: dev-scripts (when using CI builds)
      - `export RHSM_ORG="your-org-id"`
      - Guide: https://access.redhat.com/solutions/3341191
 
-   - **Option B**: Local config file [vars/init-host.yml.local](vars/init-host.yml.local)
-     - Template: [vars/init-host.yml.sample](vars/init-host.yml.sample)
-     - Check if exists
-     - Suggest copying: `cp vars/init-host.yml.sample vars/init-host.yml.local`
+   - **Option B**: Local config file [config/init-host.yml.local](config/init-host.yml.local)
+     - Base file: [deploy/openshift-clusters/vars/init-host.yml](deploy/openshift-clusters/vars/init-host.yml)
+     - Check if exists (also accept the direct-edit location `deploy/openshift-clusters/vars/init-host.yml.local`)
+     - Suggest copying: `cp deploy/openshift-clusters/vars/init-host.yml config/init-host.yml.local`
+     - The sync distributes it to `deploy/openshift-clusters/vars/init-host.yml.local`; suggest `cd deploy && make sync-config` before running the playbook directly
 
    - **Option C**: Command line (they'll add when running playbook)
 
@@ -135,17 +133,18 @@ Required for: dev-scripts (when using CI builds)
 
 **Files to configure:**
 
-1. **Instance environment**: [deploy/aws-hypervisor/instance.env](deploy/aws-hypervisor/instance.env)
-   - Template: [deploy/aws-hypervisor/instance.env.template](deploy/aws-hypervisor/instance.env.template)
-   - Check if it exists
+1. **Instance environment**: [config/instance.env](config/instance.env)
+   - Template: [config/instance.env.template](config/instance.env.template)
+   - Check if it exists (also accept the direct-edit location [deploy/aws-hypervisor/instance.env](deploy/aws-hypervisor/instance.env))
    - User must edit ALL variables with their specific values
    - Optional: Set `RHSM_ACTIVATION_KEY` and `RHSM_ORG` for hands-off deployment
      - Guide: https://access.redhat.com/solutions/3341191
-   - Suggest copying: `cp deploy/aws-hypervisor/instance.env.template deploy/aws-hypervisor/instance.env`
+   - Suggest copying: `cp config/instance.env.template config/instance.env`
+   - Every `make` target syncs it to `deploy/aws-hypervisor/instance.env` where the scripts read it
 
 **Validation:**
-- Verify [deploy/aws-hypervisor/instance.env](deploy/aws-hypervisor/instance.env) exists
-- Test by sourcing: `source deploy/aws-hypervisor/instance.env` (should not error)
+- Verify [config/instance.env](config/instance.env) (or `deploy/aws-hypervisor/instance.env`) exists
+- Test by sourcing: `source config/instance.env` (should not error)
 
 **Next steps:**
 - Quick deploy: `cd deploy && make deploy arbiter-ipi`
@@ -165,11 +164,12 @@ Required for: dev-scripts (when using CI builds)
 
 **Files to configure:**
 
-1. **Optional persistent config**: [deploy/openshift-clusters/vars/kcli.yml](deploy/openshift-clusters/vars/kcli.yml)
-   - Template: [deploy/openshift-clusters/vars/kcli.yml.template](deploy/openshift-clusters/vars/kcli.yml.template)
-   - Check if exists
+1. **Optional persistent config**: [config/kcli.yml](config/kcli.yml)
+   - Template: [config/kcli.yml.template](config/kcli.yml.template)
+   - Check if exists (also accept the direct-edit location [deploy/openshift-clusters/vars/kcli.yml](deploy/openshift-clusters/vars/kcli.yml))
    - For setting preferred defaults (cluster name, resources, etc.)
-   - Suggest copying: `cp deploy/openshift-clusters/vars/kcli.yml.template deploy/openshift-clusters/vars/kcli.yml`
+   - Suggest copying: `cp config/kcli.yml.template config/kcli.yml`
+   - The sync distributes it to `deploy/openshift-clusters/vars/kcli.yml`; suggest `cd deploy && make sync-config` before running the playbook directly
 
 **Validation:**
 - Verify inventory file exists
@@ -192,28 +192,29 @@ Required for: dev-scripts (when using CI builds)
 
 **Files to configure:**
 
-1. **Topology config files** in [deploy/openshift-clusters/roles/dev-scripts/install-dev/files/](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/):
+1. **Topology config files** in [config/](config/):
 
-   a. **Arbiter config**: [config_arbiter.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh)
-      - Template: [config_arbiter_example.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter_example.sh)
-      - Check if exists
+   a. **Arbiter config**: [config/config_arbiter.sh](config/config_arbiter.sh)
+      - Template: [config/config_arbiter_example.sh](config/config_arbiter_example.sh)
+      - Check if exists (also accept the direct-edit location `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh`)
       - User must set:
         - `OPENSHIFT_RELEASE_IMAGE` (e.g., `quay.io/openshift-release-dev/ocp-release:4.19.0-rc.5-multi-x86_64`)
         - `CI_TOKEN` (see [CI Token](#ci-token)) unless using `OPENSHIFT_CI="True"`
-      - Suggest copying: `cp deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter_example.sh deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh`
+      - Suggest copying: `cp config/config_arbiter_example.sh config/config_arbiter.sh`
 
-   b. **Fencing config**: [config_fencing.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh)
-      - Template: [config_fencing_example.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing_example.sh)
-      - Check if exists
+   b. **Fencing config**: [config/config_fencing.sh](config/config_fencing.sh)
+      - Template: [config/config_fencing_example.sh](config/config_fencing_example.sh)
+      - Check if exists (also accept the direct-edit location `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh`)
       - Same requirements as arbiter config
-      - Suggest copying: `cp deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing_example.sh deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh`
+      - Suggest copying: `cp config/config_fencing_example.sh config/config_fencing.sh`
 
+   - The sync distributes these to `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/`; suggest `cd deploy && make sync-config` before running the playbook directly
    - **Config reference**: https://github.com/openshift-metal3/dev-scripts/blob/master/config_example.sh
 
 **Validation:**
 - Verify inventory file exists
-- For arbiter: Check [config_arbiter.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh) exists
-- For fencing: Check [config_fencing.sh](deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh) exists
+- For arbiter: Check [config/config_arbiter.sh](config/config_arbiter.sh) (or the direct-edit location) exists
+- For fencing: Check [config/config_fencing.sh](config/config_fencing.sh) (or the direct-edit location) exists
 - Verify pull secret exists and is valid JSON
 
 **Next steps:**

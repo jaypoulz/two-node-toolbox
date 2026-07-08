@@ -1,0 +1,7 @@
+# Real config files (created by the user, may contain credentials) must never
+# be committed. Only templates, examples, the README, and this file are tracked.
+*
+!.gitignore
+!README.md
+!*.template
+!config_*_example.sh

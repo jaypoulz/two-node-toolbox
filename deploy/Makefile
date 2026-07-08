@@ -61,6 +61,9 @@ info:
 inventory:
 	@./aws-hypervisor/scripts/inventory.sh
 
+sync-config:
+	@bash -c 'source ./aws-hypervisor/scripts/common.sh; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
+
 fencing-ipi:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology fencing --method ipi
 
@@ -129,6 +132,8 @@ help:
 	@echo "  inventory            - Update inventory.ini with current instance IP"
 	@echo "  keep-instance        - Tag instance with keep-N retention (default: 2, max: 5)"
 	@echo "                         Usage: make keep-instance or make keep-instance DAYS=5"
+	@echo "  sync-config          - Sync files from config/ to their canonical locations"
+	@echo "                         (runs automatically before every other target)"
 	@echo ""
 	@echo "OpenShift Cluster Deployment:"
 	@echo "  fencing-ipi          - Deploy fencing IPI cluster (non-interactive)"

@@ -30,7 +30,8 @@ fi
 if [[ ! -f "${DEPLOY_DIR}/openshift-clusters/vars/assisted.yml" ]]; then
     echo "Error: vars/assisted.yml not found."
     echo "Copy the template and customize it:"
-    echo "  cp ${DEPLOY_DIR}/openshift-clusters/vars/assisted.yml.template ${DEPLOY_DIR}/openshift-clusters/vars/assisted.yml"
+    echo "  cp config/assisted.yml.template config/assisted.yml"
+    echo "(from the repository root; it is synced to vars/assisted.yml on the next run)"
     exit 1
 fi
 

@@ -1,8 +1,68 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=/dev/null
-source "${COMMON_DIR}/../instance.env"
+REPO_ROOT="$(cd "${COMMON_DIR}/../../.." && pwd)"
+
+readonly COLOR_RED='\033[0;31m'
+readonly COLOR_YELLOW='\033[0;33m'
+readonly COLOR_BLUE='\033[0;34m'
+readonly COLOR_CLEAR='\033[0m'
+
+function msg_err() {
+  echo -e "${COLOR_RED}ERROR: ${1}${COLOR_CLEAR}" >&2
+}
+
+function msg_warning() {
+  echo -e "${COLOR_YELLOW}WARNING: ${1}${COLOR_CLEAR}" >&2
+}
+
+function msg_info() {
+  echo -e "${COLOR_BLUE}INFO: ${1}${COLOR_CLEAR}" >&2
+}
+
+# Config sync manifest: "src:dest[:dest2]" entries, where src is relative to
+# config/ at the repository root and destinations are relative to the
+# repository root.
+CONFIG_SYNC_MANIFEST=(
+  "instance.env:deploy/aws-hypervisor/instance.env"
+  "config_arbiter.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh"
+  "config_fencing.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh"
+  "config_sno.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_sno.sh"
+  "pull-secret.json:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json:deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json"
+  "kcli.yml:deploy/openshift-clusters/vars/kcli.yml"
+  "assisted.yml:deploy/openshift-clusters/vars/assisted.yml"
+  "init-host.yml.local:deploy/openshift-clusters/vars/init-host.yml.local"
+)
+
+# Copies files the user created in config/ to the canonical locations the
+# scripts and playbooks read from. A file is only copied when the destination
+# is missing or the config/ copy is newer, so direct edits to the canonical
+# locations are never overwritten. Never deletes or writes back into config/.
+function sync_config_files() {
+  export CONFIG_SYNCED_COUNT=0
+  local entry src dest
+  local -a fields
+  for entry in "${CONFIG_SYNC_MANIFEST[@]}"; do
+    IFS=':' read -r -a fields <<< "${entry}"
+    src="${REPO_ROOT}/config/${fields[0]}"
+    [[ -f "${src}" ]] || continue
+    for dest in "${fields[@]:1}"; do
+      if [[ ! -f "${REPO_ROOT}/${dest}" || "${src}" -nt "${REPO_ROOT}/${dest}" ]]; then
+        msg_info "config/${fields[0]} is newer, updating ${dest}"
+        cp "${src}" "${REPO_ROOT}/${dest}"
+        CONFIG_SYNCED_COUNT=$((CONFIG_SYNCED_COUNT + 1))
+      fi
+    done
+  done
+}
+sync_config_files
+
+if [[ -f "${COMMON_DIR}/../instance.env" ]]; then
+  # shellcheck source=/dev/null
+  source "${COMMON_DIR}/../instance.env"
+else
+  msg_warning "instance.env not found (only needed for AWS hypervisor targets). To create it: cp config/instance.env.template config/instance.env and edit it."
+fi
 
 # Set defaults
 export STACK_NAME="${STACK_NAME:-${USER}-dev}"
@@ -38,23 +98,6 @@ function print_proxy_instructions() {
     echo "   (or from openshift-clusters directory: source proxy.env)"
     echo "2. Verify cluster access: oc get nodes"
     echo "3. Access the cluster console if needed"
-}
-
-readonly COLOR_RED='\033[0;31m'
-readonly COLOR_YELLOW='\033[0;33m'
-readonly COLOR_BLUE='\033[0;34m'
-readonly COLOR_CLEAR='\033[0m'
-
-function msg_err() {
-  echo -e "${COLOR_RED}ERROR: ${1}${COLOR_CLEAR}" >&2
-}
-
-function msg_warning() {
-  echo -e "${COLOR_YELLOW}WARNING: ${1}${COLOR_CLEAR}" >&2
-}
-
-function msg_info() {
-  echo -e "${COLOR_BLUE}INFO: ${1}${COLOR_CLEAR}" >&2
 }
 
 function get_ami_arch() {
