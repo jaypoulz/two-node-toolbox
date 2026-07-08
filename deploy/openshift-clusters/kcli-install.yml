@@ -75,7 +75,7 @@
         tasks_from: prerequisites.yml
 
   roles:
-    # Start ksushy BEFORE cluster installation (required for 4.20+)
+    # Start ksushy BMC simulator before cluster installation
     - role: kcli/kcli-redfish
       when: topology == "fencing"
     - kcli/kcli-install
@@ -94,15 +94,6 @@
 
     - name: Update inventory with cluster VMs
       include_tasks: roles/common/tasks/update-cluster-inventory.yml
-
-    # Configure stonith fencing after cluster installation
-    - name: Configure Redfish BMC simulation for fencing topology
-      shell: ansible-playbook kcli-redfish.yml -i {{ inventory_file | default('inventory.ini') }}
-      args:
-        chdir: "{{ playbook_dir }}"
-      delegate_to: localhost
-      run_once: true
-      when: topology == "fencing"
 
     - name: "Final verification message"
       ansible.builtin.debug:

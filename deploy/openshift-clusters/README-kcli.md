@@ -292,54 +292,26 @@ ansible-playbook kcli-install.yml -i inventory.ini \
 jq '.auths | has("registry.ci.openshift.org")' < roles/kcli/kcli-install/files/pull-secret.json
 ```
 
-## 7. Fencing Configuration (Post-Deployment)
+## 7. Fencing Configuration
 
-After a successful 4.19 kcli deployment with fencing topology, STONITH fencing needs to be configured to enable automatic node recovery. *If you are using the kcli-install playbook, this will be done for you automatically via kcli-redfish.yml**. If you're doing it some other way, you can use the kcli-redfish,yml playbook manually.
+For kcli deployments with fencing topology, the `kcli/kcli-redfish` role starts the ksushy BMC simulator before cluster installation. The cluster-etcd-operator (CEO) then auto-configures STONITH fencing during installation using the simulated BMC endpoints.
 
-The existing `redfish.yml` playbook **will not work** with kcli deployments because it expects BMH resources that don't exist in virtualized environments.
+### ksushy BMC Simulator
 
-### kcli Fencing Configuration
-
-The specialized `kcli-redfish.yml` playbook is designed for kcli deployments. **All configuration is automatically detected** - no manual variables required:
-
-```bash
-# Configure fencing for kcli-deployed cluster (fully automatic)
-ansible-playbook kcli-redfish.yml -i inventory.ini
-```
-
-The kcli-redfish playbook automatically:
-1. **Detects cluster name** from running kcli clusters or kcli-install defaults
-2. **Uses hypervisor IP** from ansible inventory host  
-3. **Pulls BMC credentials** from kcli-install role defaults
-4. **Discovers cluster nodes** from the OpenShift API
-5. **Calculates BMC endpoints** using the ksushy simulator configuration
-6. **Configures PCS stonith resources** on each node
-7. **Enables stonith globally** in the cluster
-
-### Default Configuration
-
-The playbook uses reasonable defaults that work for typical kcli deployments:
+The ksushy service provides Redfish BMC simulation for virtual machines:
 
 | Variable | Default Value | Description |
 |----------|---------------|-------------|
-| `test_cluster_name` | `tnt-cluster` | From kcli-install defaults |
 | `ksushy_ip` | `192.168.122.1` | Standard libvirt network gateway |
 | `bmc_user` | `admin` | From kcli-install defaults |
 | `bmc_password` | `admin123` | From kcli-install defaults |
 | `ksushy_port` | `9000` | From kcli-install defaults |
 
-These defaults work for standard kcli deployments where VMs use the default libvirt network (`192.168.122.x/24`).
-
-### Why Not Use redfish.yml?
-
-**Do not use the `redfish.yml` playbook** with kcli deployments. It will fail because:
+The ksushy service is managed automatically by `kcli-install.yml`. To verify it is running:
 
 ```bash
-# This will fail for kcli deployments
-ansible-playbook redfish.yml  # Expects BMH resources that don't exist
-
-# Use this instead for kcli deployments  
-ansible-playbook kcli-redfish.yml  # Uses defaults optimized for kcli
+systemctl --user status ksushy.service
+curl -sk https://192.168.122.1:9000/redfish/v1/Systems/local
 ```
 
 ## 8. Troubleshooting

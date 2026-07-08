@@ -54,9 +54,6 @@ ansible-playbook setup.yml -i inventory.ini
 ansible-playbook setup.yml -e "topology=arbiter" -e "interactive_mode=false" -i inventory.ini
 ansible-playbook setup.yml -e "topology=fencing" -e "interactive_mode=false" -i inventory.ini
 
-# Redfish stonith configuration (for fencing topology)
-ansible-playbook redfish.yml -i inventory.ini
-
 # Cleanup
 ansible-playbook clean.yml -i inventory.ini
 ```
@@ -112,7 +109,7 @@ make shellcheck
    - `assisted/acm-install`: Install ACM/MCE + assisted service + enable TNF on hub
    - `assisted/assisted-spoke`: Deploy spoke TNF cluster via assisted installer + BMH
    - `proxy-setup`: Squid proxy for cluster external access
-   - `redfish`: Automated stonith configuration for fencing topology
+   - `kcli/kcli-redfish`: ksushy BMC simulator startup for kcli fencing deployments
    - `config`: SSH key and git configuration
    - `git-user`: Git user configuration for development
 

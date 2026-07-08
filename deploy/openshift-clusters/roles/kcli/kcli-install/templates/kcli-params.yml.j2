@@ -11,10 +11,12 @@ network_type: {{ cluster_network_type }}
 platform: {{ platform }}
 
 # OpenShift version
+{% if openshift_release_image != "" %}
+version: {{ ocp_version }}
+tag: '{{ openshift_release_image }}'
+{% else %}
 version: {{ ocp_version }}
 tag: '{{ ocp_tag }}'
-{% if openshift_release_image != "" %}
-openshift_release_image: {{ openshift_release_image }}
 {% endif %}
 
 # Two-node cluster configuration
