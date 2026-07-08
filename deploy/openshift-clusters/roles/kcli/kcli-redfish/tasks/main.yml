@@ -14,18 +14,6 @@
     ksushy_ip: "192.168.122.1"
   when: ksushy_ip is not defined or ksushy_ip == ""
 
-- name: Display configuration
-  debug:
-    msg: |
-      ksushy BMC simulator configuration:
-      Cluster Name: {{ test_cluster_name }}
-      Hypervisor IP: {{ ksushy_ip }}
-      BMC User: {{ bmc_user }}
-      BMC Port: {{ ksushy_port }}
-
-- name: Start ksushy BMC simulator
-  include_tasks: start_ksushy.yml
-
 - name: Validate configuration
   assert:
     that:
@@ -40,3 +28,15 @@
       - BMC User: {{ bmc_user }}
       - BMC Password: [{{ 'SET' if bmc_password != '' else 'MISSING' }}]
   delegate_to: localhost
+
+- name: Display configuration
+  debug:
+    msg: |
+      ksushy BMC simulator configuration:
+      Cluster Name: {{ test_cluster_name }}
+      Hypervisor IP: {{ ksushy_ip }}
+      BMC User: {{ bmc_user }}
+      BMC Port: {{ ksushy_port }}
+
+- name: Start ksushy BMC simulator
+  include_tasks: start_ksushy.yml
