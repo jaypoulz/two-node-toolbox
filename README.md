@@ -103,6 +103,19 @@ Alternatively, `make patch-nodes` (from `deploy/`) clones the resource-agents re
 
 See [helpers/README.md](helpers/README.md) for full documentation.
 
+## Development
+
+Verify changes before committing (runs shellcheck, yamlfmt, and Ansible validation):
+
+```bash
+make verify        # run all checks
+make shellcheck    # shell script linting
+make yamlfmt       # YAML formatting
+make ansible-lint  # ansible-lint and playbook syntax checks
+```
+
+`make ansible-lint` runs [ansible-lint](https://ansible.readthedocs.io/projects/lint/) (configured by `.ansible-lint`) and `ansible-playbook --syntax-check` for every playbook in a container. Pre-existing findings are baselined in the `.ansible-lint` skip list; new violations fail verification. Install the pre-commit hook with `make install-pre-commit` to run `make verify` automatically.
+
 ## Troubleshooting with Claude Code
 
 If you're using [Claude Code](https://claude.ai/code), it can help you troubleshoot etcd issues on two-node fencing clusters. Simply ask Claude to diagnose your etcd problems and it will automatically collect diagnostics, analyze the cluster state, and recommend remediation steps. See [.claude/commands/etcd/README.md](.claude/commands/etcd/README.md) for details.

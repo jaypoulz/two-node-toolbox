@@ -53,6 +53,20 @@
       ansible.builtin.set_fact:
         method: "{{ prompt_result_method.user_input | default('ipi') }}"
 
+    # These asserts always run, so bad values passed via -e in non-interactive
+    # mode fail fast instead of erroring deep inside a role.
+    - name: Validate the topology value
+      ansible.builtin.assert:
+        that: topology in supported_topologies
+        fail_msg: "Unsupported topology '{{ topology }}', please select one of ({{ supported_topologies_pretty_print }})."
+      run_once: true
+
+    - name: Validate the method value
+      ansible.builtin.assert:
+        that: method in supported_methods
+        fail_msg: "Unsupported method '{{ method }}', please select one of ({{ supported_methods_pretty_print }})."
+      run_once: true
+
     - name: Pre-load variables from the 'install-dev' role
       ansible.builtin.include_vars:
         dir: roles/dev-scripts/install-dev/vars

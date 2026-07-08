@@ -81,11 +81,20 @@ make deploy fencing-assisted
 
 ### Linting and Validation
 ```bash
-# Shell script linting (from repository root)
+# Run all checks (from repository root)
+make verify
+
+# Shell script linting
 make shellcheck
-# or manually:
-./hack/shellcheck.sh
+
+# YAML formatting
+make yamlfmt
+
+# Ansible linting and playbook syntax checks
+make ansible-lint
 ```
+
+`make ansible-lint` runs ansible-lint (configured by `.ansible-lint`) plus `ansible-playbook --syntax-check` for every playbook. Pre-existing findings are baselined in the `.ansible-lint` skip list; do not add new entries to the skip list — fix new violations instead.
 
 ## Architecture and Structure
 
