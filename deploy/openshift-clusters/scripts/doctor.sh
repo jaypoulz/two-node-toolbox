@@ -19,10 +19,8 @@ REPO_ROOT="$(cd "${DEPLOY_DIR}/.." && pwd)"
 CONFIG_DIR="${REPO_ROOT}/config"
 INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 
-# SKIP_CONFIG_SYNC: doctor is read-only — suppress the automatic config sync.
-# SKIP_INSTANCE_ENV_WARNING: doctor has its own instance.env section with
-# better guidance, so suppress the generic warning from common.sh.
-export SKIP_CONFIG_SYNC=1
+# Suppress the generic instance.env warning from common.sh — doctor has its
+# own instance.env section with better guidance.
 export SKIP_INSTANCE_ENV_WARNING=1
 # shellcheck source=/dev/null
 source "${DEPLOY_DIR}/common.sh"

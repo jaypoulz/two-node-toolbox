@@ -77,7 +77,6 @@ inventory:
 
 # Sync config/ files to canonical locations before targets that consume them.
 create init redeploy-cluster \
-fencing-ipi fencing-agent arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli sno-ipi sno-agent fencing-assisted \
 baremetal-adopt baremetal-fencing-agent: sync-config
 
 sync-config:
@@ -91,6 +90,7 @@ ifeq (doctor,$(firstword $(MAKECMDGOALS)))
 $(VALID_CLUSTER_TYPES):
 	@:
 else
+$(VALID_CLUSTER_TYPES): sync-config
 fencing-ipi:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology fencing --method ipi
 
@@ -163,7 +163,7 @@ help:
 	@echo "  keep-instance        - Tag instance with keep-N retention (default: 2, max: 5)"
 	@echo "                         Usage: make keep-instance or make keep-instance DAYS=5"
 	@echo "  sync-config          - Sync files from config/ to their canonical locations"
-	@echo "                         (runs automatically before deploy and lifecycle targets)"
+	@echo "                         (runs automatically before deploy and cluster targets)"
 	@echo ""
 	@echo "OpenShift Cluster Deployment:"
 	@echo "  fencing-ipi          - Deploy fencing IPI cluster (non-interactive)"
