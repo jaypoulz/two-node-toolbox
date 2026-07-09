@@ -68,7 +68,7 @@ sync_config_files
 if [[ -f "${COMMON_DIR}/aws-hypervisor/instance.env" ]]; then
   # shellcheck source=/dev/null
   source "${COMMON_DIR}/aws-hypervisor/instance.env"
-else
+elif [[ "${SKIP_INSTANCE_ENV_WARNING:-0}" != "1" ]]; then
   msg_warning "instance.env not found (only needed for AWS hypervisor targets). To create it: cp config/instance.env.template config/instance.env and edit it."
 fi
 
