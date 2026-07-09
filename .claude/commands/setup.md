@@ -60,7 +60,7 @@ Required for: external, kcli, dev-scripts
 
 Required for: kcli, dev-scripts
 
-The same pull secret is used by both kcli and dev-scripts. Create it once in the central config folder: [config/pull-secret.json](config/pull-secret.json). The sync (run by every `make` target, or explicitly via `cd deploy && make sync-config`) distributes it to both role locations automatically.
+The same pull secret is used by both kcli and dev-scripts. Create it once in the central config folder: [config/pull-secret.json](config/pull-secret.json). The sync (run automatically before deploy and cluster `make` targets, or explicitly via `cd deploy && make sync-config`) distributes it to both role locations automatically.
 
 **Setup logic:**
 - Check if [config/pull-secret.json](config/pull-secret.json) exists
@@ -140,7 +140,7 @@ Required for: dev-scripts (when using CI builds)
    - Optional: Set `RHSM_ACTIVATION_KEY` and `RHSM_ORG` for hands-off deployment
      - Guide: https://access.redhat.com/solutions/3341191
    - Suggest copying: `cp config/instance.env.template config/instance.env`
-   - Every `make` target syncs it to `deploy/aws-hypervisor/instance.env` where the scripts read it
+   - Deploy and cluster `make` targets sync it to `deploy/aws-hypervisor/instance.env` where the scripts read it
 
 **Validation:**
 - Verify [config/instance.env](config/instance.env) (or `deploy/aws-hypervisor/instance.env`) exists

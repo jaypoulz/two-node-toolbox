@@ -61,8 +61,13 @@ info:
 inventory:
 	@./aws-hypervisor/scripts/inventory.sh
 
+# Sync config/ files to canonical locations before targets that consume them.
+create init redeploy-cluster \
+fencing-ipi fencing-agent arbiter-ipi arbiter-agent arbiter-kcli fencing-kcli sno-ipi sno-agent fencing-assisted \
+baremetal-adopt baremetal-fencing-agent: sync-config
+
 sync-config:
-	@bash -c 'set -e; source ./common.sh; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
+	@bash -c 'set -e; source ./common.sh; sync_config_files; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
 
 fencing-ipi:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology fencing --method ipi
@@ -133,7 +138,7 @@ help:
 	@echo "  keep-instance        - Tag instance with keep-N retention (default: 2, max: 5)"
 	@echo "                         Usage: make keep-instance or make keep-instance DAYS=5"
 	@echo "  sync-config          - Sync files from config/ to their canonical locations"
-	@echo "                         (runs automatically before every other target)"
+	@echo "                         (runs automatically before deploy and lifecycle targets)"
 	@echo ""
 	@echo "OpenShift Cluster Deployment:"
 	@echo "  fencing-ipi          - Deploy fencing IPI cluster (non-interactive)"

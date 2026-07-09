@@ -1,10 +1,11 @@
 # Central configuration folder
 
 This folder is the single place to create your configuration files for the toolbox.
-Every `make` target (and `make sync-config` explicitly) syncs files from here to the
-locations where the scripts and playbooks actually read them. A file is only copied
-when it is missing at the destination or the `config/` copy is newer, so editing the
-canonical locations directly still works as before.
+Deploy and lifecycle `make` targets automatically sync files from here to the
+locations where the scripts and playbooks actually read them; `make sync-config`
+runs the sync explicitly. A file is only copied when it is missing at the
+destination or the `config/` copy is newer, so editing the canonical locations
+directly still works as before.
 
 Only templates and examples are tracked in git; the `.gitignore` in this folder
 prevents your real config files (including the pull secret) from ever being committed.
@@ -25,11 +26,14 @@ prevents your real config files (including the pull secret) from ever being comm
 
 ## Syncing
 
-The sync runs automatically at the start of every script invoked through the
-`deploy/` Makefile. To run it on its own (for example before invoking
+The sync runs automatically as a Makefile prerequisite before deploy and
+cluster targets. To run it on its own (for example before invoking
 `ansible-playbook` directly):
 
 ```bash
 cd deploy/
 make sync-config
 ```
+
+Scripts run directly (bypassing `make`) do not auto-sync — run
+`make sync-config` first, or use `make` targets.

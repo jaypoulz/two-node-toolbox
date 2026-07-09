@@ -63,7 +63,6 @@ function sync_config_files() {
     done
   done
 }
-sync_config_files
 
 if [[ -f "${COMMON_DIR}/aws-hypervisor/instance.env" ]]; then
   # shellcheck source=/dev/null

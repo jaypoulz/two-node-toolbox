@@ -5,7 +5,7 @@ This directory contains scripts for managing EC2 instances used as hypervisors f
 ## Configuration
 
 ### Environment Setup
-Copy the `config/instance.env.template` file at the repository root to `config/instance.env` and set all variables to valid values for your user. Every `make` target syncs it to `instance.env` in this directory, where the scripts read it.
+Copy the `config/instance.env.template` file at the repository root to `config/instance.env` and set all variables to valid values for your user. The Makefile syncs it to `instance.env` in this directory before deploy and cluster targets; run `make sync-config` explicitly when invoking scripts directly.
 
 ```bash
 # From the repository root

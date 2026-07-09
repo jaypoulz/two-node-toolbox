@@ -131,7 +131,7 @@ make ansible-lint
 ### Key Configuration Files
 
 #### Central config/ Folder
-User configuration files are created in `config/` at the repository root (templates and examples live there; see `config/README.md`). Every make-accessible script syncs `config/` files to the canonical locations below before doing anything else (newer-wins, never deletes); `make sync-config` runs the sync explicitly. Editing the canonical locations directly still works: a `config/` file only becomes authoritative once the user creates it.
+User configuration files are created in `config/` at the repository root (templates and examples live there; see `config/README.md`). The Makefile runs `sync-config` as a prerequisite before deploy and cluster targets, copying `config/` files to the canonical locations below (newer-wins, never deletes); `make sync-config` runs the sync explicitly. Editing the canonical locations directly still works: a `config/` file only becomes authoritative once the user creates it.
 
 - `config/instance.env`: AWS hypervisor settings (copy from `config/instance.env.template`)
 - `config/pull-secret.json`: OpenShift pull secret, fanned out to both dev-scripts and kcli role locations
