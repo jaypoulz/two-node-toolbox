@@ -62,7 +62,7 @@ inventory:
 	@./aws-hypervisor/scripts/inventory.sh
 
 sync-config:
-	@bash -c 'source ./aws-hypervisor/scripts/common.sh; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
+	@bash -c 'source ./common.sh; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
 
 fencing-ipi:
 	@./openshift-clusters/scripts/deploy-cluster.sh --topology fencing --method ipi

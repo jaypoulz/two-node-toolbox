@@ -1,7 +1,7 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/common.sh"
+source "${SCRIPT_DIR}/../../common.sh"
 
 node_dir="$(get_node_dir)"
 instance_ip="$(cat "${node_dir}/ssh_user")@$(cat "${node_dir}/public_address")"

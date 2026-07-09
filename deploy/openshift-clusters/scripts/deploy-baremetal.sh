@@ -16,6 +16,9 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OC_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEPLOY_DIR="$(cd "${OC_DIR}/.." && pwd)"
+# shellcheck source=/dev/null
+source "${DEPLOY_DIR}/common.sh"
 
 INVENTORY="${OC_DIR}/inventory_baremetal.ini"
 PLAYBOOK="${OC_DIR}/deploy-baremetal.yml"

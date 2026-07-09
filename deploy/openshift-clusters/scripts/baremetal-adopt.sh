@@ -499,25 +499,29 @@ main() {
         exit 0
     fi
 
-    # Output alongside existing dev-scripts config files
-    local output_dir="${OC_DIR}/roles/dev-scripts/install-dev/files"
+    local repo_root
+    repo_root="$(cd "${OC_DIR}/../.." && pwd)"
+    local config_dir="${repo_root}/config"
+    local files_dir="${OC_DIR}/roles/dev-scripts/install-dev/files"
 
-    # Generate artifacts
-    local nodes_file="${output_dir}/ironic_nodes.json"
+    # Generate ironic nodes alongside existing dev-scripts files
+    local nodes_file="${files_dir}/ironic_nodes.json"
     generate_ironic_nodes_json "${nodes_file}"
 
-    # NODES_FILE path on the hypervisor — resolves when dev-scripts sources the config
+    # Generate config into config/ — sync-config carries it to the canonical location
     local remote_nodes_path="\${PWD}/ironic_nodes.json"
-    generate_baremetal_config "${output_dir}/config_baremetal_fencing.sh" "${remote_nodes_path}"
+    generate_baremetal_config "${config_dir}/config_baremetal_fencing.sh" "${remote_nodes_path}"
 
     echo ""
     info "Adoption complete. Generated artifacts:"
     echo "    ${nodes_file}"
-    echo "    ${output_dir}/config_baremetal_fencing.sh"
+    echo "    ${config_dir}/config_baremetal_fencing.sh"
     echo ""
-    echo "  Before deploying, verify these values in ${output_dir}/config_baremetal_fencing.sh:"
+    echo "  Before deploying, verify these values in ${config_dir}/config_baremetal_fencing.sh:"
     echo "    - CI_TOKEN        (get from console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com)"
     echo "    - OPENSHIFT_RELEASE_IMAGE  (find tags at quay.io/openshift-release-dev/ocp-release)"
+    echo ""
+    echo "  The config will be synced to its canonical location automatically by 'make sync-config'."
     echo ""
     echo "  Next: deploy to the nodes using one of the baremetal-deploy* options"
 }

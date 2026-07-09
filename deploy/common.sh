@@ -1,7 +1,7 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${COMMON_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${COMMON_DIR}/.." && pwd)"
 
 readonly COLOR_RED='\033[0;31m'
 readonly COLOR_YELLOW='\033[0;33m'
@@ -28,6 +28,7 @@ CONFIG_SYNC_MANIFEST=(
   "config_arbiter.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh"
   "config_fencing.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh"
   "config_sno.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_sno.sh"
+  "config_baremetal_fencing.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_baremetal_fencing.sh"
   "pull-secret.json:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json:deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json"
   "kcli.yml:deploy/openshift-clusters/vars/kcli.yml"
   "assisted.yml:deploy/openshift-clusters/vars/assisted.yml"
@@ -46,6 +47,10 @@ function sync_config_files() {
     IFS=':' read -r -a fields <<< "${entry}"
     src="${REPO_ROOT}/config/${fields[0]}"
     [[ -f "${src}" ]] || continue
+    if [[ ! -s "${src}" ]]; then
+      msg_warning "config/${fields[0]} is empty (0 bytes), skipping sync"
+      continue
+    fi
     for dest in "${fields[@]:1}"; do
       if [[ ! -f "${REPO_ROOT}/${dest}" || "${src}" -nt "${REPO_ROOT}/${dest}" ]]; then
         msg_info "config/${fields[0]} is newer, updating ${dest}"
@@ -57,9 +62,9 @@ function sync_config_files() {
 }
 sync_config_files
 
-if [[ -f "${COMMON_DIR}/../instance.env" ]]; then
+if [[ -f "${COMMON_DIR}/aws-hypervisor/instance.env" ]]; then
   # shellcheck source=/dev/null
-  source "${COMMON_DIR}/../instance.env"
+  source "${COMMON_DIR}/aws-hypervisor/instance.env"
 else
   msg_warning "instance.env not found (only needed for AWS hypervisor targets). To create it: cp config/instance.env.template config/instance.env and edit it."
 fi
@@ -78,13 +83,13 @@ export CAPACITY_RESERVATION_DURATION_MINUTES="${CAPACITY_RESERVATION_DURATION_MI
 export NODE_ID="${NODE_ID:-node-0}"
 
 get_shared_dir() {
-  echo "${COMMON_DIR}/../${SHARED_DIR}"
+  echo "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}"
 }
 
 get_node_dir() {
-  local node_dir="${COMMON_DIR}/../${SHARED_DIR}/${NODE_ID}"
-  if [[ ! -d "$node_dir" && -f "${COMMON_DIR}/../${SHARED_DIR}/aws-instance-id" ]]; then
-    echo "${COMMON_DIR}/../${SHARED_DIR}"
+  local node_dir="${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}/${NODE_ID}"
+  if [[ ! -d "$node_dir" && -f "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}/aws-instance-id" ]]; then
+    echo "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}"
     return
   fi
   echo "$node_dir"

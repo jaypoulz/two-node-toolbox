@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
 
 # shellcheck source=/dev/null
-source "${DEPLOY_DIR}/aws-hypervisor/scripts/common.sh"
+source "${DEPLOY_DIR}/common.sh"
 
 set -o nounset
 set -o errexit

@@ -8,7 +8,7 @@ DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 REPO_ROOT="$(cd "${DEPLOY_DIR}/.." && pwd)"
 
 # shellcheck source=/dev/null
-source "${DEPLOY_DIR}/aws-hypervisor/scripts/common.sh"
+source "${DEPLOY_DIR}/common.sh"
 
 set -o nounset
 set -o errexit
