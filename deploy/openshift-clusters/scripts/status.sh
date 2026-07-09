@@ -14,7 +14,7 @@ DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
 # common.sh sources instance.env unconditionally; silence the noise when it
 # is missing, since its absence is reported in the local config section.
 # shellcheck source=/dev/null
-source "${DEPLOY_DIR}/aws-hypervisor/scripts/common.sh" 2>/dev/null
+source "${DEPLOY_DIR}/common.sh" 2>/dev/null
 
 # Intentionally no errexit: probes are allowed to fail per section.
 set -o nounset
