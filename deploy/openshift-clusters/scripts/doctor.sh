@@ -15,6 +15,8 @@
 SCRIPT_DIR=$(dirname "$0")
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
+REPO_ROOT="$(cd "${DEPLOY_DIR}/.." && pwd)"
+CONFIG_DIR="${REPO_ROOT}/config"
 INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 
 # common.sh provides the color constants, msg_* helpers, and env defaults, but
@@ -22,10 +24,10 @@ INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 # does not exist yet (its absence is reported as a proper check below).
 if [[ -f "${INSTANCE_ENV}" ]]; then
   # shellcheck source=/dev/null
-  source "${DEPLOY_DIR}/aws-hypervisor/scripts/common.sh"
+  source "${DEPLOY_DIR}/common.sh"
 else
   # shellcheck source=/dev/null
-  source "${DEPLOY_DIR}/aws-hypervisor/scripts/common.sh" 2>/dev/null
+  source "${DEPLOY_DIR}/common.sh" 2>/dev/null
 fi
 
 # Strict flags only after common.sh: it expands variables that may be unset.
@@ -164,7 +166,7 @@ if [[ -n "${SSH_PUBLIC_KEY:-}" ]]; then
     check_pass "SSH public key found (SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY})"
   else
     check_fail "SSH_PUBLIC_KEY in instance.env points to a missing file: ${SSH_PUBLIC_KEY}" \
-      "fix the path in ${INSTANCE_ENV}, or generate a key: 'ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519'"
+      "fix the path in ${CONFIG_DIR}/instance.env, or generate a key: 'ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519'"
   fi
 elif [[ -f "${HOME}/.ssh/id_ed25519.pub" ]]; then
   check_pass "SSH public key found (~/.ssh/id_ed25519.pub)"
@@ -233,7 +235,7 @@ fi
 section "AWS hypervisor (instance.env)"
 
 if [[ ! -f "${INSTANCE_ENV}" ]]; then
-  check_note "section skipped: instance.env not found (only needed for the AWS hypervisor flow) - to use it: 'cp ${INSTANCE_ENV}.template ${INSTANCE_ENV}' and edit"
+  check_note "section skipped: instance.env not found (only needed for the AWS hypervisor flow) - to use it: 'cp ${CONFIG_DIR}/instance.env.template ${CONFIG_DIR}/instance.env' and edit"
 else
   # set +u: the deployment scripts never source instance.env under nounset,
   # so the probe must not be stricter than real usage
@@ -242,14 +244,14 @@ else
     check_pass "instance.env sources cleanly"
   else
     check_fail "instance.env does not source cleanly: ${SOURCE_ERR}" \
-      "fix the shell syntax in ${INSTANCE_ENV}"
+      "fix the shell syntax in ${CONFIG_DIR}/instance.env"
   fi
 
   if [[ -n "${REGION:-}" && -n "${AWS_PROFILE:-}" ]]; then
     check_pass "REGION (${REGION}) and AWS_PROFILE (${AWS_PROFILE}) are set"
   else
     check_fail "REGION and/or AWS_PROFILE not set by instance.env" \
-      "set REGION and AWS_PROFILE in ${INSTANCE_ENV} (see instance.env.template)"
+      "set REGION and AWS_PROFILE in ${CONFIG_DIR}/instance.env (see ${CONFIG_DIR}/instance.env.template)"
   fi
 
   if ! command -v aws >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
@@ -284,14 +286,14 @@ if [[ -f "${DS_PULL_SECRET}" ]]; then
     DS_PULL_SECRET_OK=1
   else
     check_fail "pull-secret.json is not valid JSON (dev-scripts)" \
-      "re-download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${DS_PULL_SECRET}"
+      "re-download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
   fi
 elif [[ "${NEED_DEVSCRIPTS}" -eq 1 ]]; then
   check_fail "pull-secret.json missing (required for the requested dev-scripts deployment)" \
-    "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${DS_PULL_SECRET}"
+    "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
 else
   check_warn "pull-secret.json missing (needed for dev-scripts deployments)" \
-    "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${DS_PULL_SECRET}"
+    "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
 fi
 
 for topology in arbiter fencing sno; do
@@ -299,10 +301,10 @@ for topology in arbiter fencing sno; do
   if [[ ! -f "${CONFIG_FILE}" ]]; then
     if topology_required "${topology}"; then
       check_fail "config_${topology}.sh missing (required for the requested deployment)" \
-        "cp ${DS_FILES_DIR}/config_${topology}_example.sh ${CONFIG_FILE} and set OPENSHIFT_RELEASE_IMAGE / CI_TOKEN"
+        "cp ${CONFIG_DIR}/config_${topology}_example.sh ${CONFIG_DIR}/config_${topology}.sh and set OPENSHIFT_RELEASE_IMAGE / CI_TOKEN"
     else
       check_warn "config_${topology}.sh missing (only needed to deploy the ${topology} topology with dev-scripts)" \
-        "cp ${DS_FILES_DIR}/config_${topology}_example.sh ${CONFIG_FILE} and set OPENSHIFT_RELEASE_IMAGE / CI_TOKEN"
+        "cp ${CONFIG_DIR}/config_${topology}_example.sh ${CONFIG_DIR}/config_${topology}.sh and set OPENSHIFT_RELEASE_IMAGE / CI_TOKEN"
     fi
     continue
   fi
@@ -315,7 +317,7 @@ for topology in arbiter fencing sno; do
       check_pass "pull secret has registry.ci.openshift.org auth (used by config_${topology}.sh)"
     else
       check_fail "config_${topology}.sh uses registry.ci.openshift.org but the pull secret has no auth entry for it" \
-        "add CI registry credentials to ${DS_PULL_SECRET}, or switch to a public release image (quay.io/openshift-release-dev/ocp-release)"
+        "add CI registry credentials to ${CONFIG_DIR}/pull-secret.json, or switch to a public release image (quay.io/openshift-release-dev/ocp-release)"
     fi
   fi
 
@@ -334,7 +336,7 @@ for topology in arbiter fencing sno; do
         check_warn "CI token check: could not reach ${RELEASE_REGISTRY} (network failure or timeout)"
       elif [[ "${HTTP_CODE}" == "401" ]]; then
         check_fail "CI token in config_${topology}.sh is invalid or expired (HTTP 401 from ${RELEASE_REGISTRY})" \
-          "update CI_TOKEN in ${CONFIG_FILE} (copy a fresh token from the CI cluster console)"
+          "update CI_TOKEN in ${CONFIG_DIR}/config_${topology}.sh (copy a fresh token from the CI cluster console)"
       elif [[ "${HTTP_CODE}" == "200" ]]; then
         check_pass "CI token in config_${topology}.sh accepted by ${RELEASE_REGISTRY}"
       else
@@ -361,19 +363,18 @@ else
       check_pass "pull-secret.json present and valid JSON (kcli)"
     else
       check_fail "pull-secret.json is not valid JSON (kcli)" \
-        "re-download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${KCLI_PULL_SECRET}"
+        "re-download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
     fi
     if [[ -f "${DS_PULL_SECRET}" ]] && ! cmp -s "${KCLI_PULL_SECRET}" "${DS_PULL_SECRET}"; then
-      # per the /setup docs, both locations are meant to hold the same secret
       check_warn "kcli pull-secret.json differs from the dev-scripts copy" \
-        "cp ${DS_PULL_SECRET} ${KCLI_PULL_SECRET} (or the other way around, whichever is current)"
+        "save the correct version to ${CONFIG_DIR}/pull-secret.json and run 'make sync-config' to update both locations"
     fi
   elif [[ "${NEED_KCLI}" -eq 1 ]]; then
     check_fail "pull-secret.json missing (required for the requested kcli deployment)" \
-      "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${KCLI_PULL_SECRET}"
+      "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
   else
     check_warn "pull-secret.json missing (needed for *-kcli deployments)" \
-      "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${KCLI_PULL_SECRET}"
+      "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
   fi
 fi
 
@@ -382,7 +383,7 @@ fi
 echo ""
 echo "Summary: ${PASS_COUNT} passed, ${WARN_COUNT} warnings, ${FAIL_COUNT} failures"
 if [[ ${FAIL_COUNT} -gt 0 ]]; then
-  msg_err "configuration is not ready - address the FAIL items above"
+  printf '%b%s%b\n' "${COLOR_RED:-}" "ERROR: configuration is not ready - address the FAIL items above" "${COLOR_CLEAR:-}" >&2
   exit 1
 fi
 exit 0
