@@ -511,7 +511,8 @@ main() {
     # Generate config into config/ — sync-config carries it to the canonical location
     local remote_nodes_path="\${PWD}/ironic_nodes.json"
     if [[ -f "${config_dir}/config_baremetal_fencing.sh" ]]; then
-        local backup="${config_dir}/config_baremetal_fencing.sh.bak.$(date +%s)"
+        local backup
+        backup="${config_dir}/config_baremetal_fencing.sh.bak.$(date +%s)"
         cp "${config_dir}/config_baremetal_fencing.sh" "${backup}"
         info "Existing config_baremetal_fencing.sh backed up to ${backup}"
     fi
