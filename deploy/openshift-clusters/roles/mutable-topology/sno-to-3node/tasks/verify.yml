@@ -1,4 +1,43 @@
 ---
+- name: "[verify] Wait for topology transition and operators to stabilize (up to 20 minutes)"
+  shell: |
+    OUTPUT=$(oc adm transition topology status 2>&1)
+    echo "$OUTPUT"
+
+    # The status command already validates everything - just check its output
+    # Success indicators: "No transition in progress" and "All cluster operators healthy"
+    if echo "$OUTPUT" | grep -q "No transition in progress"; then
+      if echo "$OUTPUT" | grep -q "All cluster operators healthy"; then
+        echo "VERIFICATION_COMPLETE: Topology stable and all operators healthy"
+        exit 0
+      fi
+    fi
+
+    # If we get here, still transitioning or operators not yet healthy
+    exit 1
+  environment: "{{ sno_oc_env }}"
+  register: transition_status
+  changed_when: false
+  failed_when: false
+  retries: 120
+  delay: 10
+  until: >-
+    transition_status is defined and
+    transition_status.rc is defined and
+    transition_status.rc == 0
+
+- name: "[verify] Display cluster operator status"
+  debug:
+    msg: "{{ transition_status.stdout }}"
+  when: transition_status is defined
+
+- name: "[verify] Check operator stability"
+  fail:
+    msg: "Cluster operators did not stabilize after 20 minutes. See status output above."
+  when:
+    - transition_status is defined
+    - transition_status.rc != 0
+
 - name: "[verify] Get node count and status"
   shell: |
     oc get nodes --no-headers
@@ -32,43 +71,14 @@
   debug:
     msg: "etcd pods: {{ verify_etcd.stdout | trim }}"
 
-- name: "[verify] Get CVO replica count"
-  shell: |
-    oc get deployment cluster-version-operator -n openshift-cluster-version \
-      -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "unknown"
-  environment: "{{ sno_oc_env }}"
-  register: verify_cvo
-  changed_when: false
-
-- name: "[verify] CVO status"
-  debug:
-    msg: "CVO replicas: {{ verify_cvo.stdout }} (expected: 0 - CVO intentionally scaled down)"
-
 - name: "[verify] Get cluster operator summary"
   shell: |
-    oc get co -o json | python3 -c "
-    import json, sys
-    data = json.load(sys.stdin)
-    total = len(data['items'])
-    degraded = []
-    unavailable = []
-    for co in data['items']:
-        name = co['metadata']['name']
-        conds = {c['type']: c['status'] for c in co.get('status', {}).get('conditions', [])}
-        if conds.get('Degraded') == 'True':
-            degraded.append(name)
-        if conds.get('Available') == 'False':
-            unavailable.append(name)
-    print(f'Total COs: {total}')
-    if degraded:
-        print(f'Degraded: {chr(44).join(degraded)}')
-    else:
-        print('Degraded: none')
-    if unavailable:
-        print(f'Unavailable: {chr(44).join(unavailable)}')
-    else:
-        print('Unavailable: none')
-    "
+    TOTAL=$(oc get co -o json | jq '.items | length')
+    DEGRADED=$(oc get co -o json | jq -r '[.items[] | select(.status.conditions[] | select(.type=="Degraded" and .status=="True")) | .metadata.name] | if length > 0 then join(",") else "none" end')
+    UNAVAILABLE=$(oc get co -o json | jq -r '[.items[] | select(.status.conditions[] | select(.type=="Available" and .status=="False")) | .metadata.name] | if length > 0 then join(",") else "none" end')
+    echo "Total COs: ${TOTAL}"
+    echo "Degraded: ${DEGRADED}"
+    echo "Unavailable: ${UNAVAILABLE}"
   environment: "{{ sno_oc_env }}"
   register: verify_co
   changed_when: false
@@ -108,4 +118,4 @@
     msg: >-
       MIGRATION COMPLETE: {{ verify_nodes.stdout_lines | length }} nodes,
       {{ verify_etcd.stdout | trim }} etcd members,
-      topology={{ verify_topo.stdout }}, CVO={{ verify_cvo.stdout }} replicas.
+      topology={{ verify_topo.stdout }}.
