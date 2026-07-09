@@ -44,13 +44,13 @@ if [ "${OPENSHIFT_CI:-}" != "" ]; then
   cd "${REPO_ROOT}"
 else
   mkdir -p "${COLLECTIONS_CACHE}"
-  $CONTAINER_ENGINE run --rm \
+  "${CONTAINER_ENGINE}" run --rm \
     --env OPENSHIFT_CI=TRUE \
     --env COLLECTIONS_CACHE=/var/cache/tnt-ansible-collections \
     --volume "${PWD}:/workdir:z" \
     --volume "${COLLECTIONS_CACHE}:/var/cache/tnt-ansible-collections:z" \
     --entrypoint bash \
     --workdir /workdir \
-    $CONTAINER_IMAGE \
+    "${CONTAINER_IMAGE}" \
     hack/ansible-lint.sh "${@}"
 fi
