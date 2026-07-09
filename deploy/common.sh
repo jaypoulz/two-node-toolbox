@@ -54,7 +54,10 @@ function sync_config_files() {
     for dest in "${fields[@]:1}"; do
       if [[ ! -f "${REPO_ROOT}/${dest}" || "${src}" -nt "${REPO_ROOT}/${dest}" ]]; then
         msg_info "config/${fields[0]} is newer, updating ${dest}"
-        cp "${src}" "${REPO_ROOT}/${dest}"
+        if ! cp "${src}" "${REPO_ROOT}/${dest}"; then
+          msg_err "Failed to sync config/${fields[0]} to ${dest}"
+          continue
+        fi
         CONFIG_SYNCED_COUNT=$((CONFIG_SYNCED_COUNT + 1))
       fi
     done

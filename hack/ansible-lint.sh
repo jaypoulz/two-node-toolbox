@@ -35,9 +35,11 @@ if [ "${OPENSHIFT_CI:-}" != "" ]; then
   for DIR in "${PLAYBOOK_DIRS[@]}"; do
     echo "Syntax-checking playbooks in ${DIR}..."
     cd "${REPO_ROOT}/${DIR}"
+    shopt -s nullglob
     for PLAYBOOK in *.yml; do
       ansible-playbook --syntax-check "${PLAYBOOK}"
     done
+    shopt -u nullglob
   done
   cd "${REPO_ROOT}"
 else

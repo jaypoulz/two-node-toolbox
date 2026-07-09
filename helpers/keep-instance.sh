@@ -15,7 +15,7 @@ fi
 
 # common.sh syncs config/ files and sources instance.env (for REGION)
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/../deploy/aws-hypervisor/scripts/common.sh"
+source "${SCRIPT_DIR}/../deploy/common.sh"
 
 REGION="${REGION:-${AWS_DEFAULT_REGION:-}}"
 if [[ -z "${REGION}" ]]; then
