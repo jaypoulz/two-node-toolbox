@@ -22,6 +22,8 @@ INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 # common.sh provides the color constants, msg_* helpers, and env defaults, but
 # unconditionally sources instance.env; silence that noise when instance.env
 # does not exist yet (its absence is reported as a proper check below).
+# SKIP_CONFIG_SYNC: doctor is read-only — suppress the automatic config sync.
+export SKIP_CONFIG_SYNC=1
 if [[ -f "${INSTANCE_ENV}" ]]; then
   # shellcheck source=/dev/null
   source "${DEPLOY_DIR}/common.sh"
@@ -87,6 +89,7 @@ usage() {
 TARGETED=0
 NEED_DEVSCRIPTS=0
 NEED_KCLI=0
+NEED_ASSISTED=0
 REQUIRED_TOPOLOGIES=" "
 
 for arg in "$@"; do
@@ -99,6 +102,7 @@ for arg in "$@"; do
       # assisted deploys the hub via fencing-ipi, so it needs the dev-scripts config
       TARGETED=1
       NEED_DEVSCRIPTS=1
+      NEED_ASSISTED=1
       REQUIRED_TOPOLOGIES+="fencing "
       ;;
     arbiter-ipi|arbiter-agent|fencing-ipi|fencing-agent|sno-ipi|sno-agent)
@@ -375,6 +379,29 @@ else
   else
     check_warn "pull-secret.json missing (needed for *-kcli deployments)" \
       "download it from https://cloud.redhat.com/openshift/install/pull-secret and save it to ${CONFIG_DIR}/pull-secret.json"
+  fi
+fi
+
+# --- assisted installer configuration ---
+
+section "assisted installer configuration"
+
+ASSISTED_VARS="${DEPLOY_DIR}/openshift-clusters/vars/assisted.yml"
+
+if [[ "${NEED_ASSISTED}" -eq 0 && ! -f "${ASSISTED_VARS}" ]]; then
+  check_note "section skipped: no assisted config detected (vars/assisted.yml) - only needed for fencing-assisted deployments"
+else
+  if [[ -f "${ASSISTED_VARS}" ]]; then
+    check_pass "vars/assisted.yml present"
+    SPOKE_NAME="$(sed -nE 's/^spoke_cluster_name:[[:space:]]*"?([^"]+)"?.*/\1/p' "${ASSISTED_VARS}" | head -1)"
+    if [[ -n "${SPOKE_NAME}" ]]; then
+      check_pass "spoke_cluster_name set to '${SPOKE_NAME}'"
+    else
+      check_warn "spoke_cluster_name not set in vars/assisted.yml (defaults to 'spoke-tnf')"
+    fi
+  elif [[ "${NEED_ASSISTED}" -eq 1 ]]; then
+    check_fail "vars/assisted.yml missing (required for fencing-assisted deployment)" \
+      "cp ${CONFIG_DIR}/assisted.yml.template ${CONFIG_DIR}/assisted.yml and edit it"
   fi
 fi
 
