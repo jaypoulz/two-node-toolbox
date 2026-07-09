@@ -19,18 +19,13 @@ REPO_ROOT="$(cd "${DEPLOY_DIR}/.." && pwd)"
 CONFIG_DIR="${REPO_ROOT}/config"
 INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 
-# common.sh provides the color constants, msg_* helpers, and env defaults, but
-# unconditionally sources instance.env; silence that noise when instance.env
-# does not exist yet (its absence is reported as a proper check below).
 # SKIP_CONFIG_SYNC: doctor is read-only — suppress the automatic config sync.
+# SKIP_INSTANCE_ENV_WARNING: doctor has its own instance.env section with
+# better guidance, so suppress the generic warning from common.sh.
 export SKIP_CONFIG_SYNC=1
-if [[ -f "${INSTANCE_ENV}" ]]; then
-  # shellcheck source=/dev/null
-  source "${DEPLOY_DIR}/common.sh"
-else
-  # shellcheck source=/dev/null
-  source "${DEPLOY_DIR}/common.sh" 2>/dev/null
-fi
+export SKIP_INSTANCE_ENV_WARNING=1
+# shellcheck source=/dev/null
+source "${DEPLOY_DIR}/common.sh"
 
 # Strict flags only after common.sh: it expands variables that may be unset.
 # No 'set -e': a failing check must report and let the remaining checks run.
@@ -198,7 +193,10 @@ REQUIREMENTS_FILE="${DEPLOY_DIR}/openshift-clusters/collections/requirements.yml
 if ! command -v ansible-galaxy >/dev/null 2>&1; then
   check_warn "collection check skipped: 'ansible-galaxy' not found on PATH" "$(tool_hint ansible-playbook)"
 else
-  INSTALLED_COLLECTIONS="$(ansible-galaxy collection list 2>/dev/null)"
+  if ! INSTALLED_COLLECTIONS="$(ansible-galaxy collection list 2>&1)"; then
+    check_warn "ansible-galaxy collection list failed; collection check unreliable" \
+      "run 'ansible-galaxy collection list' manually to diagnose"
+  fi
   MISSING_COLLECTIONS=""
   while read -r name; do
     [[ -z "${name}" ]] && continue
@@ -267,6 +265,8 @@ else
       check_pass "AWS credentials are live (sts get-caller-identity succeeded)"
     elif [[ ${AWS_RC} -eq 124 ]]; then
       check_warn "AWS credential check timed out after 15s" "check network/VPN connectivity and retry"
+    elif [[ ${AWS_RC} -ge 125 ]]; then
+      check_warn "AWS credential check could not run (exit ${AWS_RC})"
     else
       check_fail "AWS credentials not working: $(head -1 <<<"${AWS_ERR}")" \
         "log in again (e.g. 'aws sso login --profile ${AWS_PROFILE:-<profile>}') or check 'aws configure list'"
@@ -337,7 +337,7 @@ for topology in arbiter fencing sno; do
         -H "Authorization: Bearer ${CI_TOKEN}" "https://${RELEASE_REGISTRY}/v2/")"
       CURL_RC=$?
       if [[ ${CURL_RC} -ne 0 ]]; then
-        check_warn "CI token check: could not reach ${RELEASE_REGISTRY} (network failure or timeout)"
+        check_warn "CI token check: curl failed (exit ${CURL_RC}) reaching ${RELEASE_REGISTRY}"
       elif [[ "${HTTP_CODE}" == "401" ]]; then
         check_fail "CI token in config_${topology}.sh is invalid or expired (HTTP 401 from ${RELEASE_REGISTRY})" \
           "update CI_TOKEN in ${CONFIG_DIR}/config_${topology}.sh (copy a fresh token from the CI cluster console)"
