@@ -15,6 +15,9 @@ exclude_paths:
 # ansible-lint cannot see when invoked from the repository root.
 mock_roles:
   - git-user
+  - assisted/acm-install
+  - assisted/assisted-spoke
+  - kcli/kcli-redfish
 
 # Baseline debt: rules that fire on the pre-existing tree. New violations of any
 # rule NOT listed here fail `make verify`. Burn these down over time by fixing
