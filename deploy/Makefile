@@ -83,7 +83,12 @@ create init redeploy-cluster \
 baremetal-adopt baremetal-fencing-agent: sync-config
 
 sync-config:
-	@bash -c 'set -e; source ./common.sh; sync_config_files; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
+	@bash -c 'set -e; source ./common.sh; sync_config_files; \
+	  if [ "$${CONFIG_SYNC_ERRORS:-0}" -gt 0 ]; then \
+	    echo "sync-config: $${CONFIG_SYNC_ERRORS} file(s) failed to sync." >&2; exit 1; \
+	  elif [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then \
+	    echo "Config files: everything up to date."; \
+	  fi'
 
 doctor:
 	@./openshift-clusters/scripts/doctor.sh $(DOCTOR_ARGS)
