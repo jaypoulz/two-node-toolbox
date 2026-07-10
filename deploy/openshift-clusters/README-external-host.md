@@ -57,9 +57,12 @@ See [hands-off deployment](../aws-hypervisor/README.md#automated-rhsm-registrati
 
 #### Option B: Local Variable File
 ```bash
-cp vars/init-host.yml vars/init-host.yml.local
-# Edit vars/init-host.yml.local with your credentials
+# From the repository root
+cp deploy/openshift-clusters/vars/init-host.yml config/init-host.yml.local
+# Edit config/init-host.yml.local with your credentials, then distribute it:
+cd deploy/ && make sync-config
 ```
+Creating `vars/init-host.yml.local` directly still works as before.
 
 #### Option C: Command Line
 ```bash

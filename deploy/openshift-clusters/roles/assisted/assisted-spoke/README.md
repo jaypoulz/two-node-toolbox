@@ -97,12 +97,14 @@ ansible-playbook assisted-install.yml -i inventory.ini
 
 ### Configuration
 
-Copy and customize the variables template:
+Copy and customize the variables template in the central `config/` folder at the repository root:
 
 ```bash
-cp vars/assisted.yml.template vars/assisted.yml
-# Edit vars/assisted.yml with desired spoke configuration
+cp config/assisted.yml.template config/assisted.yml
+# Edit config/assisted.yml with desired spoke configuration
 ```
+
+The make targets sync it to `vars/assisted.yml`, where the playbook reads it (creating `vars/assisted.yml` directly still works).
 
 ### Accessing the Spoke Cluster
 

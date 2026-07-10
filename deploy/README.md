@@ -40,7 +40,9 @@ Additionally, if you're using Mac OS, you might not have `timeout`, so you might
 
 ## Configuration
 
-Before deployment, configure your environment by setting up the `aws-hypervisor/instance.env` file. Copy `aws-hypervisor/instance.env.template` to `aws-hypervisor/instance.env` and set all variables to valid values for your user.
+Run `make doctor` at any time to validate your setup before deploying. It is a read-only preflight that checks required tools, SSH keys, Ansible collections, and every configuration file, and prints a concrete fix command for each problem it finds. Use `make doctor <cluster-type>` (for example `make doctor fencing-kcli`) to validate strictly for a specific deployment type: the checks specific to that deployment method become mandatory.
+
+Before deployment, configure your environment by creating an `instance.env` file in the central [config/](../config/) folder. Copy `config/instance.env.template` to `config/instance.env` and set all variables to valid values for your user. Deploy and cluster `make` targets automatically sync `config/` files to the locations the scripts read them from (`aws-hypervisor/instance.env` in this case); run `make sync-config` to sync explicitly. Editing `aws-hypervisor/instance.env` directly still works as before. See [config/README.md](../config/README.md) for all available configuration files.
 
 ## Available Commands
 

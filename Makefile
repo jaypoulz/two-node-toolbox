@@ -5,12 +5,16 @@ shellcheck:
 yamlfmt:
 	@./hack/yamlfmt.sh
 
+ansible-lint:
+	@./hack/ansible-lint.sh
+
 test-resource-agents:
 	@./helpers/resource-agents-build/local-build-test.sh $(ARGS)
 
 verify:
 	VALIDATE_ONLY=true $(MAKE) shellcheck
 	VALIDATE_ONLY=true $(MAKE) yamlfmt
+	$(MAKE) ansible-lint
 
 install-pre-commit:
 	@echo "Installing pre-commit hook..."

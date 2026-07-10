@@ -49,7 +49,7 @@ Required Ansible collections (install with `ansible-galaxy collection install -r
 
 This role follows the same authentication file conventions as the dev-scripts role for consistency:
 
-- **Pull Secret**: Must be placed in role `files/pull-secret.json` and will be automatically copied to remote host user home directory
+- **Pull Secret**: Read from role `files/pull-secret.json` and automatically copied to remote host user home directory. Create it as `config/pull-secret.json` at the repository root (the make targets sync it here), or place it in `files/` directly
 - **SSH Key**: Read from localhost (`~/.ssh/id_ed25519.pub` on ansible controller) and copied to remote host for kcli, plus installed as authorized key via config role
 
 ## Role Variables
@@ -60,7 +60,7 @@ This role follows the same authentication file conventions as the dev-scripts ro
 - `topology`: Cluster topology - "fencing" or "arbiter" (matches install-dev role)
 - `domain`: Base domain for the cluster
 - `pull_secret_path`: Path to OpenShift pull secret file in role files directory (default: `{{ role_path }}/files/pull-secret.json`)
-  - Place your pull secret as `pull-secret.json` in the `files/` directory
+  - Create your pull secret as `config/pull-secret.json` at the repository root (synced here by the make targets), or place it as `pull-secret.json` in the `files/` directory directly
 
 ### Cluster Configuration
 
@@ -78,7 +78,7 @@ This role follows the same authentication file conventions as the dev-scripts ro
 - `vm_disk_size`: Disk size per node in GB (default: 120)
 
 ### OpenShift Version
-See [defaults](../../../vars/kcli.yml.template) for default values
+See [defaults](../../../../../config/kcli.yml.template) for default values
 
 If you're installing a specific openshift release image, you will need to set the proper channel in ocp_version
 - `ocp_version`: OpenShift version channel
@@ -132,15 +132,15 @@ If you're installing a specific openshift release image, you will need to set th
 ansible-galaxy collection install -r collections/requirements.yml
 ```
 
-2. Download OpenShift pull secret and place in role files directory:
+2. Download OpenShift pull secret and place it in the central `config/` folder:
 ```bash
-# Navigate to the kcli-install files directory
-cd roles/kcli/kcli-install/files/
-
-# Create pull secret file (paste your pull secret content)
-cat > pull-secret.json << EOF
+# From the repository root, create the pull secret file (paste your pull secret content)
+cat > config/pull-secret.json << EOF
 {"auths":{"your-pull-secret-content-here"}}
 EOF
+
+# Distribute it to the role files directory (or let any make target do it)
+cd deploy/ && make sync-config && cd ../
 ```
    - For CI builds: Ensure pull secret includes `registry.ci.openshift.org` access
 

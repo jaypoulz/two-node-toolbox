@@ -13,12 +13,9 @@ if [[ -z "${INSTANCE_ID}" ]]; then
     exit 1
 fi
 
-# Source instance.env for REGION (same as deploy/aws-hypervisor/scripts/common.sh)
-INSTANCE_ENV="${SCRIPT_DIR}/../deploy/aws-hypervisor/instance.env"
-if [[ -f "${INSTANCE_ENV}" ]]; then
-    # shellcheck source=/dev/null
-    source "${INSTANCE_ENV}"
-fi
+# common.sh syncs config/ files and sources instance.env (for REGION)
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/../deploy/common.sh"
 
 REGION="${REGION:-${AWS_DEFAULT_REGION:-}}"
 if [[ -z "${REGION}" ]]; then

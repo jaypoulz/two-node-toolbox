@@ -1,44 +1,7 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=/dev/null
-source "${COMMON_DIR}/../instance.env"
-
-# Set defaults
-export STACK_NAME="${STACK_NAME:-${USER}-dev}"
-export SHARED_DIR="${SHARED_DIR:-instance-data}"
-export RHEL_HOST_ARCHITECTURE="${RHEL_HOST_ARCHITECTURE:-x86_64}"
-export EC2_INSTANCE_TYPE="${EC2_INSTANCE_TYPE:-c5n.metal}"
-export RHEL_VERSION="${RHEL_VERSION:-9.6}"
-
-# Capacity reservation defaults
-export ENABLE_CAPACITY_RESERVATION="${ENABLE_CAPACITY_RESERVATION:-true}"
-export CAPACITY_RESERVATION_DURATION_MINUTES="${CAPACITY_RESERVATION_DURATION_MINUTES:-60}"
-
-export NODE_ID="${NODE_ID:-node-0}"
-
-get_shared_dir() {
-  echo "${COMMON_DIR}/../${SHARED_DIR}"
-}
-
-get_node_dir() {
-  local node_dir="${COMMON_DIR}/../${SHARED_DIR}/${NODE_ID}"
-  if [[ ! -d "$node_dir" && -f "${COMMON_DIR}/../${SHARED_DIR}/aws-instance-id" ]]; then
-    echo "${COMMON_DIR}/../${SHARED_DIR}"
-    return
-  fi
-  echo "$node_dir"
-}
-
-function print_proxy_instructions() {
-    echo ""
-    echo "Next steps:"
-    echo "1. Source the proxy environment from anywhere:"
-    echo "   source ${DEPLOY_DIR}/openshift-clusters/proxy.env"
-    echo "   (or from openshift-clusters directory: source proxy.env)"
-    echo "2. Verify cluster access: oc get nodes"
-    echo "3. Access the cluster console if needed"
-}
+REPO_ROOT="$(cd "${COMMON_DIR}/.." && pwd)"
 
 readonly COLOR_RED='\033[0;31m'
 readonly COLOR_YELLOW='\033[0;33m'
@@ -55,6 +18,93 @@ function msg_warning() {
 
 function msg_info() {
   echo -e "${COLOR_BLUE}INFO: ${1}${COLOR_CLEAR}" >&2
+}
+
+# Config sync manifest: "src:dest[:dest2]" entries, where src is relative to
+# config/ at the repository root and destinations are relative to the
+# repository root.
+CONFIG_SYNC_MANIFEST=(
+  "instance.env:deploy/aws-hypervisor/instance.env"
+  "config_arbiter.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh"
+  "config_fencing.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh"
+  "config_sno.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_sno.sh"
+  "config_baremetal_fencing.sh:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_baremetal_fencing.sh"
+  "pull-secret.json:deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json:deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json"
+  "kcli.yml:deploy/openshift-clusters/vars/kcli.yml"
+  "assisted.yml:deploy/openshift-clusters/vars/assisted.yml"
+  "init-host.yml.local:deploy/openshift-clusters/vars/init-host.yml.local"
+)
+
+# Copies files the user created in config/ to the canonical locations the
+# scripts and playbooks read from. A file is only copied when the destination
+# is missing or the config/ copy is newer, so direct edits to the canonical
+# locations are never overwritten. Never deletes or writes back into config/.
+function sync_config_files() {
+  export CONFIG_SYNCED_COUNT=0
+  local entry src dest
+  local -a fields
+  for entry in "${CONFIG_SYNC_MANIFEST[@]}"; do
+    IFS=':' read -r -a fields <<< "${entry}"
+    src="${REPO_ROOT}/config/${fields[0]}"
+    [[ -f "${src}" ]] || continue
+    if [[ ! -s "${src}" ]]; then
+      msg_warning "config/${fields[0]} is empty (0 bytes), skipping sync"
+      continue
+    fi
+    for dest in "${fields[@]:1}"; do
+      if [[ ! -f "${REPO_ROOT}/${dest}" || "${src}" -nt "${REPO_ROOT}/${dest}" ]]; then
+        msg_info "config/${fields[0]} is newer, updating ${dest}"
+        if ! cp "${src}" "${REPO_ROOT}/${dest}"; then
+          msg_err "Failed to sync config/${fields[0]} to ${dest}"
+          continue
+        fi
+        CONFIG_SYNCED_COUNT=$((CONFIG_SYNCED_COUNT + 1))
+      fi
+    done
+  done
+}
+
+if [[ -f "${COMMON_DIR}/aws-hypervisor/instance.env" ]]; then
+  # shellcheck source=/dev/null
+  source "${COMMON_DIR}/aws-hypervisor/instance.env"
+elif [[ "${SKIP_INSTANCE_ENV_WARNING:-0}" != "1" ]]; then
+  msg_warning "instance.env not found (only needed for AWS hypervisor targets). To create it: cp config/instance.env.template config/instance.env and edit it."
+fi
+
+# Set defaults
+export STACK_NAME="${STACK_NAME:-${USER}-dev}"
+export SHARED_DIR="${SHARED_DIR:-instance-data}"
+export RHEL_HOST_ARCHITECTURE="${RHEL_HOST_ARCHITECTURE:-x86_64}"
+export EC2_INSTANCE_TYPE="${EC2_INSTANCE_TYPE:-c5n.metal}"
+export RHEL_VERSION="${RHEL_VERSION:-9.6}"
+
+# Capacity reservation defaults
+export ENABLE_CAPACITY_RESERVATION="${ENABLE_CAPACITY_RESERVATION:-true}"
+export CAPACITY_RESERVATION_DURATION_MINUTES="${CAPACITY_RESERVATION_DURATION_MINUTES:-60}"
+
+export NODE_ID="${NODE_ID:-node-0}"
+
+get_shared_dir() {
+  echo "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}"
+}
+
+get_node_dir() {
+  local node_dir="${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}/${NODE_ID}"
+  if [[ ! -d "$node_dir" && -f "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}/aws-instance-id" ]]; then
+    echo "${COMMON_DIR}/aws-hypervisor/${SHARED_DIR}"
+    return
+  fi
+  echo "$node_dir"
+}
+
+function print_proxy_instructions() {
+    echo ""
+    echo "Next steps:"
+    echo "1. Source the proxy environment from anywhere:"
+    echo "   source ${DEPLOY_DIR}/openshift-clusters/proxy.env"
+    echo "   (or from openshift-clusters directory: source proxy.env)"
+    echo "2. Verify cluster access: oc get nodes"
+    echo "3. Access the cluster console if needed"
 }
 
 function get_ami_arch() {

@@ -6,6 +6,8 @@ This repository provides automation for deploying and managing two-node OpenShif
 
 ## Quick Start
 
+Configuration files (instance settings, pull secret, topology configs) are created in the central [config/](config/) folder; see [config/README.md](config/README.md) for the full list. Every `make` command syncs them to the locations where the automation reads them. Editing the canonical locations directly still works as before.
+
 ### Option 1: AWS Hypervisor (Automated)
 
 If you have AWS access, use the automated workflow. Most lifecycle operations can be performed from the [deploy](deploy/) folder using `make`:
@@ -48,6 +50,8 @@ ansible-playbook setup.yml -i inventory.ini        # dev-scripts (arbiter or fen
 ansible-playbook kcli-install.yml -i inventory.ini # kcli (fencing only)
 ```
 
+If you created your configuration files in [config/](config/), run `make sync-config` from the [deploy/](deploy/) folder first to distribute them, since the playbooks are invoked directly here.
+
 See [deploy/openshift-clusters/README-external-host.md](deploy/openshift-clusters/README-external-host.md) for detailed instructions.
 
 ## Deployment Methods
@@ -75,6 +79,8 @@ If you're using [Claude Code](https://claude.ai/code), use the `/setup` command 
 - Validating your setup
 
 Run `/setup` to begin, or `/setup <method>` to configure a specific deployment method (aws, external, kcli, dev-scripts).
+
+If you are not using Claude Code, or want a quick non-interactive check, run `make doctor` from the `deploy/` directory. It validates required tools, SSH keys, Ansible collections, and configuration files, printing a fix command for every problem found. `make doctor <cluster-type>` (for example `make doctor arbiter-ipi`) validates strictly for one deployment type.
 ## Helpers
 
 The [helpers/](helpers/) directory contains utilities for cluster operations including resource-agents patching, fencing validation, and containerized build validation. To quickly verify a resource-agents branch compiles on CentOS Stream 9 and 10:
@@ -102,6 +108,19 @@ ansible-playbook -i deploy/openshift-clusters/inventory.ini \
 Alternatively, `make patch-nodes` (from `deploy/`) clones the resource-agents repo on the EC2 hypervisor, builds the RPM there natively, and patches the cluster nodes — all in one step, without needing a local container build.
 
 See [helpers/README.md](helpers/README.md) for full documentation.
+
+## Development
+
+Verify changes before committing (runs shellcheck, yamlfmt, and Ansible validation):
+
+```bash
+make verify        # run all checks
+make shellcheck    # shell script linting
+make yamlfmt       # YAML formatting
+make ansible-lint  # ansible-lint and playbook syntax checks
+```
+
+`make ansible-lint` runs [ansible-lint](https://ansible.readthedocs.io/projects/lint/) (configured by `.ansible-lint`) and `ansible-playbook --syntax-check` for every playbook in a container. Pre-existing findings are baselined in the `.ansible-lint` skip list; new violations fail verification. Install the pre-commit hook with `make install-pre-commit` to run `make verify` automatically.
 
 ## Troubleshooting with Claude Code
 

@@ -12,3 +12,4 @@ clusters/
 vars/*.local
 vars/*-local.yml
 vars/*.yml.local
+vars/assisted.yml

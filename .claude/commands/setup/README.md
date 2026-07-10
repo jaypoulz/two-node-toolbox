@@ -40,7 +40,7 @@ Configures deployment to your own RHEL 9 server (non-AWS).
 Configures automated RHEL hypervisor deployment in AWS EC2.
 
 **Files configured:**
-- `deploy/aws-hypervisor/instance.env` - AWS instance configuration
+- `config/instance.env` - AWS instance configuration (synced to `deploy/aws-hypervisor/instance.env`)
 
 **Use when:** You want to deploy a hypervisor in AWS
 
@@ -49,8 +49,8 @@ Configures kcli-based OpenShift deployment (fencing topology).
 
 **Files configured:**
 - `deploy/openshift-clusters/inventory.ini` - Target host details
-- `deploy/openshift-clusters/roles/kcli/kcli-install/files/pull-secret.json` - OpenShift pull secret
-- `deploy/openshift-clusters/vars/kcli.yml` (optional) - Persistent kcli preferences
+- `config/pull-secret.json` - OpenShift pull secret (synced to the kcli role files directory)
+- `config/kcli.yml` (optional) - Persistent kcli preferences (synced to `deploy/openshift-clusters/vars/kcli.yml`)
 - SSH key validation
 
 **Use when:** You want to deploy using the modern kcli method
@@ -60,9 +60,9 @@ Configures traditional dev-scripts deployment (arbiter or fencing topology).
 
 **Files configured:**
 - `deploy/openshift-clusters/inventory.ini` - Target host details
-- `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_arbiter.sh` - Arbiter config
-- `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/config_fencing.sh` - Fencing config
-- `deploy/openshift-clusters/roles/dev-scripts/install-dev/files/pull-secret.json` - OpenShift pull secret
+- `config/config_arbiter.sh` - Arbiter config (synced to the dev-scripts role files directory)
+- `config/config_fencing.sh` - Fencing config (synced to the dev-scripts role files directory)
+- `config/pull-secret.json` - OpenShift pull secret (synced to both the dev-scripts and kcli role files directories)
 - Ansible collections installation
 - SSH key validation
 

@@ -53,19 +53,16 @@ The kcli-install role automatically handles target host setup including:
 
 #### Pull Secret
 
-Place your pull secret in the role files directory:
+Place your pull secret in the central `config/` folder at the repository root:
 
 ```bash
-# Navigate to the kcli-install files directory
-cd roles/kcli/kcli-install/files/
-
-# Create pull secret file (paste your pull secret content)
-cat > pull-secret.json << EOF
+# From the repository root, create the pull secret file (paste your pull secret content)
+cat > config/pull-secret.json << EOF
 {"auths":{"your-pull-secret-content-here"}}
 EOF
 ```
 
-The deployment will automatically copy the pull secret from the files directory to the remote host during deployment.
+The `make` targets sync it to the role files directory (`roles/kcli/kcli-install/files/pull-secret.json`); if you run `ansible-playbook` directly, run `make sync-config` from the `deploy/` directory first. Creating the file directly in the role files directory still works as before. The deployment will automatically copy the pull secret from the files directory to the remote host during deployment.
 
 #### SSH Key (Automatic from Localhost)
 The deployment automatically reads your SSH public key from `~/.ssh/id_ed25519.pub` on your **local machine** (ansible controller) and:
@@ -91,9 +88,9 @@ You can configure the deployment using any combination of these methods (in prec
 1. **Command line variables** (highest precedence)
 2. **Playbook vars section**
 3. **vars/kcli.yml** (user configuration file)
-4. **Role defaults** (lowest precedence) (`vars/kcli.yml.template`)
+4. **Role defaults** (lowest precedence) (`config/kcli.yml.template` at the repository root)
 
-For simple overrides, the command line is recommended. For setting your preferred permanent config, copy [kcli.yml.template](vars/kcli.yml.template) to [kcli.yml](vars/kcli.yml) and update the values to your preference. This file is not tracked by Git and will persist between TNT updates. 
+For simple overrides, the command line is recommended. For setting your preferred permanent config, copy [kcli.yml.template](../../config/kcli.yml.template) at the repository root to `config/kcli.yml` and update the values to your preference. The `make` targets sync it to `vars/kcli.yml`, where the playbook reads it; if you run `ansible-playbook` directly, run `make sync-config` from the `deploy/` directory first (creating `vars/kcli.yml` directly still works). This file is not tracked by Git and will persist between TNT updates. 
 
 You can find more information on the official ansible documentation https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_variables.html:
 

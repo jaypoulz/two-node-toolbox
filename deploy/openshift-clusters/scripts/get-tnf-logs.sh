@@ -7,6 +7,9 @@ DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # Get the repository root directory (one level up from deploy)
 REPO_ROOT="$(cd "${DEPLOY_DIR}/.." && pwd)"
 
+# shellcheck source=/dev/null
+source "${DEPLOY_DIR}/common.sh"
+
 set -o nounset
 set -o errexit
 set -o pipefail

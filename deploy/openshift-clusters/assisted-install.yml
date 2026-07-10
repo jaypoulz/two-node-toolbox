@@ -2,7 +2,8 @@
 # Deploy a spoke TNF cluster via ACM/assisted installer on an existing hub cluster.
 #
 # Prerequisites:
-#   - vars/assisted.yml exists (copy from vars/assisted.yml.template)
+#   - vars/assisted.yml exists (copy config/assisted.yml.template to
+#     config/assisted.yml at the repo root; make targets sync it here)
 #
 # Usage:
 #   make deploy fencing-assisted

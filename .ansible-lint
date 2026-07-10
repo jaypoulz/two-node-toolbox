@@ -1,0 +1,44 @@
+---
+# Configuration for ansible-lint, run via `make ansible-lint` (hack/ansible-lint.sh).
+profile: basic
+
+# Collections are pre-installed by hack/ansible-lint.sh; never reach out to galaxy.
+offline: true
+
+exclude_paths:
+  # Claude Code skill/command content, not Ansible
+  - .claude/
+  # CloudFormation templates, not Ansible
+  - deploy/aws-hypervisor/templates/
+
+# Roles are resolved relative to deploy/openshift-clusters/ at runtime, which
+# ansible-lint cannot see when invoked from the repository root.
+mock_roles:
+  - git-user
+  - assisted/acm-install
+  - assisted/assisted-spoke
+  - kcli/kcli-redfish
+
+# Baseline debt: rules that fire on the pre-existing tree. New violations of any
+# rule NOT listed here fail `make verify`. Burn these down over time by fixing
+# the findings and removing entries from this list.
+skip_list:
+  - command-instead-of-module
+  - command-instead-of-shell
+  - jinja[spacing]
+  - key-order[task]
+  - literal-compare
+  - name[casing]
+  - name[missing]
+  - name[play]
+  - name[template]
+  - role-name
+  - role-name[path]
+  - schema[playbook]
+  - var-naming[no-role-prefix]
+  - var-naming[read-only]
+  - yaml[empty-lines]
+  - yaml[line-length]
+  - yaml[new-line-at-end-of-file]
+  - yaml[trailing-spaces]
+  - yaml[truthy]

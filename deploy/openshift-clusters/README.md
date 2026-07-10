@@ -59,7 +59,7 @@ The deployment process involves updating configuration files and running an Ansi
 **Tip**: To skip the `-i inventory.ini` argument in all ansible commands, copy the inventory file to Ansible's default location (`/etc/ansible/hosts` on Linux, may vary on other operating systems). 
 
 #### Config files for dev-scripts
-- In `roles/dev-scripts/install-dev/files/`, review `config_XXXXX_example.sh` files and copy them to `config_XXXXX.sh` as needed, removing the `_example` from the filename.
+- In the `config/` folder at the repository root, review the `config_XXXXX_example.sh` files and copy them to `config/config_XXXXX.sh` as needed, removing the `_example` from the filename. The `make` targets sync them to `roles/dev-scripts/install-dev/files/`, where the playbooks read them; if you run `ansible-playbook` directly, run `make sync-config` from the `deploy/` directory first. Creating `config_XXXXX.sh` directly in `roles/dev-scripts/install-dev/files/` still works as before.
 - The config file for each topology is slightly different. Sample `config_arbiter_example.sh` and `config_fencing_example.sh` files are provided, ready to use with the AWS dev hypervisor. You can change the variables inside (see Note below), but when copying them, the expected file names are `config_arbiter.sh` and `config_fencing.sh`.
 - The arbiter config file contains separate configuration sections for IPI and Agent-based installations. Use the appropriate section based on your chosen installation method.
 - Unless you're using `OPENSHIFT_CI="True"` to avoid using private images, you should fill CI_TOKEN with your own token. You can get it from https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com. Start by clicking your name in the top right and clicking "copy login command." At this point, a new window will open, and you should click on "Display Token." It should now display an API token you can copy over to your profile.
@@ -69,7 +69,7 @@ The deployment process involves updating configuration files and running an Ansi
   > Note: The config.sh file is passed to metal-scripts. A full list of acceptable values can be found by checking the linked config_example.sh file in the [openshift-metal3/dev-scripts/config_example.sh](https://github.com/openshift-metal3/dev-scripts/blob/master/config_example.sh) repository.
 
 #### Pull secret
-- Create `pull-secret.json`: Create a file named pull-secret.json in the `roles/dev-scripts/install-dev/files/` directory and paste your pull secret JSON string into it.
+- Create `pull-secret.json`: Create a file named pull-secret.json in the `config/` folder at the repository root and paste your pull secret JSON string into it. The sync distributes it to both the dev-scripts and kcli role locations. (Creating it directly in `roles/dev-scripts/install-dev/files/` still works as before.)
 
 
 #### SSH access (optional)
