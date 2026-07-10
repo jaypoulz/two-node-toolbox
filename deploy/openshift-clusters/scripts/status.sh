@@ -11,13 +11,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
 
-# common.sh sources instance.env unconditionally; silence the noise when it
-# is missing, since its absence is reported in the local config section.
-# shellcheck source=/dev/null
-source "${DEPLOY_DIR}/common.sh" 2>/dev/null
+# Suppress the generic instance.env warning from common.sh — the local config
+# section already reports its absence with better guidance.
+SKIP_INSTANCE_ENV_WARNING=1 source "${DEPLOY_DIR}/common.sh"
 
 # Intentionally no errexit: probes are allowed to fail per section.
-set -o nounset
+set -uo pipefail
 
 INSTANCE_ENV="${DEPLOY_DIR}/aws-hypervisor/instance.env"
 PROXY_ENV="${DEPLOY_DIR}/openshift-clusters/proxy.env"
@@ -171,8 +170,12 @@ elif [[ "${INSTANCE_RUNNING}" != "true" ]]; then
 elif [[ -z "${PUBLIC_ADDRESS}" || -z "${SSH_USER}" ]]; then
     st_skip "missing public_address or ssh_user in instance-data - cannot SSH"
 else
-    REMOTE_OUTPUT="$(ssh -o ConnectTimeout=10 -o BatchMode=yes \
+    REMOTE_OUTPUT="$(timeout 30 ssh -o ConnectTimeout=10 -o BatchMode=yes \
         "${SSH_USER}@${PUBLIC_ADDRESS}" bash -s -- "${CLUSTER_TOPOLOGY}" 2>/dev/null << 'REMOTE_EOF'
+        if ! sudo -n true 2>/dev/null; then
+            echo "SUDO_FAILED"
+        fi
+
         TOPOLOGY="$1"
 
         if [[ -d ~/openshift-metal3/dev-scripts ]]; then
@@ -213,6 +216,9 @@ REMOTE_EOF
         VM_COUNT=0
         while IFS= read -r line; do
             case "${line}" in
+                "SUDO_FAILED")
+                    st_warn "sudo access unavailable — VM and BMC status may be incomplete"
+                    ;;
                 "DEVSCRIPTS present")
                     st_pass "dev-scripts directory present (~/openshift-metal3/dev-scripts)"
                     ;;
@@ -279,8 +285,8 @@ else
         st_warn "cluster API unreachable through the proxy"
         st_info "if the cluster should be up, restart the proxy on the host: 'make ssh' then 'podman restart external-squid'"
     else
-        READY_COUNT="$(echo "${NODES_OUTPUT}" | awk '$2 == "Ready"' | wc -l)"
-        NOT_READY_COUNT="$(echo "${NODES_OUTPUT}" | awk '$2 != "Ready"' | wc -l)"
+        READY_COUNT="$(echo "${NODES_OUTPUT}" | awk '$2 ~ /^Ready/' | wc -l)"
+        NOT_READY_COUNT="$(echo "${NODES_OUTPUT}" | awk '$2 !~ /^Ready/' | wc -l)"
         if [[ ${NOT_READY_COUNT} -eq 0 ]]; then
             st_pass "cluster API reachable: ${READY_COUNT} node(s) Ready"
         else
