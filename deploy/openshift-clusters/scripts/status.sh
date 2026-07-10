@@ -119,7 +119,8 @@ else
             if [[ "${INSTANCE_STATE}" == "running" ]]; then
                 INSTANCE_RUNNING=true
                 UPTIME_NOTE=""
-                LAUNCH_EPOCH="$(date -u -d "${LAUNCH_TIME}" +%s 2>/dev/null || echo "")"
+                LAUNCH_EPOCH="$(date -u -d "${LAUNCH_TIME}" +%s 2>/dev/null || \
+                    date -u -j -f "%Y-%m-%dT%H:%M:%S" "${LAUNCH_TIME%%.*}" +%s 2>/dev/null || echo "")"
                 if [[ -n "${LAUNCH_EPOCH}" ]]; then
                     UPTIME_SECONDS=$(( $(date -u +%s) - LAUNCH_EPOCH ))
                     UPTIME_NOTE=" (up $(( UPTIME_SECONDS / 3600 ))h $(( (UPTIME_SECONDS % 3600) / 60 ))m)"
