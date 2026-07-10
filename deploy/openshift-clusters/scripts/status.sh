@@ -13,6 +13,7 @@ DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
 
 # Suppress the generic instance.env warning from common.sh — the local config
 # section already reports its absence with better guidance.
+# shellcheck source=/dev/null
 SKIP_INSTANCE_ENV_WARNING=1 source "${DEPLOY_DIR}/common.sh"
 
 # Intentionally no errexit: probes are allowed to fail per section.
