@@ -92,6 +92,31 @@
     label: "{{ item.item.name }}"
   when: ssh_key_propagation is defined
 
+- name: Test direct SSH access to first node from laptop
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o ConnectTimeout=5 -o BatchMode=yes \
+      "core@{{ parsed_vm_entries[0].ip }}" "echo ok" 2>/dev/null
+  register: direct_ssh_test
+  failed_when: false
+  changed_when: false
+  when: ssh_key_valid | default(false)
+
+- name: Set direct access fact
+  set_fact:
+    direct_node_access: "{{ (direct_ssh_test.rc | default(1)) == 0 }}"
+
+- name: Display connectivity mode
+  debug:
+    msg: >-
+      {% if direct_node_access | bool %}
+      Direct SSH to nodes works — inventory will use direct access (no ProxyJump).
+      {% else %}
+      Direct SSH to nodes unavailable — inventory will use ProxyJump via {{ provisioning_host_user }}@{{ provisioning_host_addr }}.
+      {% endif %}
+
 - name: Update inventory file with cluster nodes
   delegate_to: localhost
   become: false
@@ -123,7 +148,11 @@
           {% endfor %}
 
           [cluster_nodes:vars]
+          {% if direct_node_access | bool %}
+          ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          {% else %}
           ansible_ssh_common_args="-o ProxyJump={{ provisioning_host_user }}@{{ provisioning_host_addr }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          {% endif %}
           ansible_user=core
 
     - name: Write updated inventory
@@ -140,6 +169,10 @@
           - {{ entry.name }}: {{ entry.ip }}
           {% endfor %}
 
-          Nodes are accessible via ProxyJump through {{ provisioning_host_user }}@{{ provisioning_host_addr }}
+          {% if direct_node_access | bool %}
+          Nodes are accessible directly from this machine (no ProxyJump).
+          {% else %}
+          Nodes are accessible via ProxyJump through {{ provisioning_host_user }}@{{ provisioning_host_addr }}.
+          {% endif %}
 
           Test: ansible -i inventory_baremetal.ini -m ping cluster_nodes
