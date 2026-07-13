@@ -24,7 +24,7 @@ make deploy sno-agent      # Single Node OpenShift (Agent method)
 
 # Other useful commands
 make ssh                   # SSH into hypervisor
-make info                  # Display instance information
+make status                # Show instance and cluster status dashboard
 make clean                 # Clean OpenShift cluster
 make get-tnf-logs          # Collect cluster logs from VMs
 make patch-nodes           # Build and patch resource-agents RPM

@@ -41,6 +41,7 @@ CONFIG_SYNC_MANIFEST=(
 # locations are never overwritten. Never deletes or writes back into config/.
 function sync_config_files() {
   export CONFIG_SYNCED_COUNT=0
+  export CONFIG_SYNC_ERRORS=0
   local entry src dest
   local -a fields
   for entry in "${CONFIG_SYNC_MANIFEST[@]}"; do
@@ -56,6 +57,7 @@ function sync_config_files() {
         msg_info "config/${fields[0]} is newer, updating ${dest}"
         if ! cp "${src}" "${REPO_ROOT}/${dest}"; then
           msg_err "Failed to sync config/${fields[0]} to ${dest}"
+          CONFIG_SYNC_ERRORS=$((CONFIG_SYNC_ERRORS + 1))
           continue
         fi
         CONFIG_SYNCED_COUNT=$((CONFIG_SYNCED_COUNT + 1))

@@ -69,8 +69,11 @@ clean-spoke:
 ssh:
 	@./aws-hypervisor/scripts/ssh.sh
 
-info:
-	@./aws-hypervisor/scripts/print_instance_data.sh
+status:
+	@./openshift-clusters/scripts/status.sh
+
+# Alias kept for muscle memory: 'make info' output is part of 'make status'
+info: status
 
 inventory:
 	@./aws-hypervisor/scripts/inventory.sh
@@ -80,7 +83,12 @@ create init redeploy-cluster \
 baremetal-adopt baremetal-fencing-agent: sync-config
 
 sync-config:
-	@bash -c 'set -e; source ./common.sh; sync_config_files; if [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then echo "Config files: everything up to date."; fi'
+	@bash -c 'set -e; source ./common.sh; sync_config_files; \
+	  if [ "$${CONFIG_SYNC_ERRORS:-0}" -gt 0 ]; then \
+	    echo "sync-config: $${CONFIG_SYNC_ERRORS} file(s) failed to sync." >&2; exit 1; \
+	  elif [ "$${CONFIG_SYNCED_COUNT:-0}" -eq 0 ]; then \
+	    echo "Config files: everything up to date."; \
+	  fi'
 
 doctor:
 	@./openshift-clusters/scripts/doctor.sh $(DOCTOR_ARGS)
@@ -156,7 +164,8 @@ help:
 	@echo ""
 	@echo "Instance Utils:"
 	@echo "  ssh                  - SSH into the EC2 instance"
-	@echo "  info                 - Display instance information"
+	@echo "  status               - Show status dashboard (instance, cluster VMs, proxy, cluster API)"
+	@echo "  info                 - Alias for status"
 	@echo "  inventory            - Update inventory.ini with current instance IP"
 	@echo "  doctor               - Validate configuration and prerequisites (read-only)"
 	@echo "  doctor <cluster-type>- Validate strictly for a specific cluster type"

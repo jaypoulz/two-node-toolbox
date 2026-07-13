@@ -43,7 +43,7 @@ This is the target host where the cluster will be deployed.
 > Note: Log in to subscription manager where appropriate for some package installs.
 
 #### (Optional) Pre-configured remote host in AWS
-If you have an AWS account available, you can use the tools in [aws-hypervisor](/deploy/aws-hypervisor/README.md) to deploy a host that will be ready to run this installation. After finishing the process, running `make info` will provide the necessary instance information to edit `inventory.ini` (see below). You can also run `make help` to see all available instance management commands.
+If you have an AWS account available, you can use the tools in [aws-hypervisor](/deploy/aws-hypervisor/README.md) to deploy a host that will be ready to run this installation. After finishing the process, running `make status` will provide the necessary instance information to edit `inventory.ini` (see below). You can also run `make help` to see all available instance management commands.
 
 ## 2. Deploying the Cluster
 

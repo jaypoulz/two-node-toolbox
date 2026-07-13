@@ -85,11 +85,13 @@ Establishes SSH connection to the EC2 instance using the configured key and user
 ./scripts/ssh.sh
 ```
 
-#### `print_instance_data.sh`
-Displays current instance information including IP addresses, instance ID, and connection details.
+#### Instance status
+Instance information (stack, IP address, SSH user, Cockpit URL) is included in the
+status dashboard, together with live instance state and cluster health:
 
 ```bash
-./scripts/print_instance_data.sh
+# From the deploy/ directory
+make status
 ```
 
 #### `inventory.sh`
