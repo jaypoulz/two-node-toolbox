@@ -293,7 +293,7 @@ else
             st_pass "cluster API reachable: ${READY_COUNT} node(s) Ready"
         else
             st_warn "cluster API reachable: ${READY_COUNT} node(s) Ready, ${NOT_READY_COUNT} node(s) not Ready"
-            echo "${NODES_OUTPUT}" | awk '$2 != "Ready" {print "         " $1 ": " $2}'
+            echo "${NODES_OUTPUT}" | awk '$2 !~ /^Ready/ {print "         " $1 ": " $2}'
         fi
     fi
 fi
