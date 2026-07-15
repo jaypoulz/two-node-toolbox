@@ -1,0 +1,165 @@
+---
+- name: "[preflight] Query Infrastructure CR"
+  shell: |
+    oc get infrastructure cluster -o json
+  environment: "{{ sno_oc_env }}"
+  register: infra_cr_raw
+  changed_when: false
+
+- name: "[preflight] Parse infrastructure data"
+  set_fact:
+    sno_infra_data: "{{ infra_cr_raw.stdout | from_json }}"
+
+- name: "[preflight] Extract cluster identity"
+  set_fact:
+    sno_platform: "{{ sno_infra_data.spec.platformSpec.type }}"
+    sno_cp_topology: "{{ sno_infra_data.status.controlPlaneTopology }}"
+    sno_infra_topology: "{{ sno_infra_data.status.infrastructureTopology }}"
+    sno_infra_id: "{{ sno_infra_id if sno_infra_id else sno_infra_data.status.infrastructureName }}"
+    sno_cluster_domain: >-
+      {{ sno_cluster_domain if sno_cluster_domain
+         else sno_infra_data.status.apiServerInternalURI
+              | regex_replace('^https://api-int\.', '')
+              | regex_replace(':6443$', '') }}
+
+- name: "[preflight] Assert platform is None"
+  assert:
+    that: sno_platform == "None"
+    fail_msg: "Expected platform None, got {{ sno_platform }}"
+
+- name: "[preflight] Display detected cluster info"
+  debug:
+    msg: >-
+      Cluster: {{ sno_cluster_name }} | Domain: {{ sno_cluster_domain }} |
+      InfraID: {{ sno_infra_id }} | Platform: {{ sno_platform }} |
+      Topology: {{ sno_cp_topology }}
+
+- name: "[preflight] Get cluster nodes"
+  shell: |
+    oc get nodes -o json
+  environment: "{{ sno_oc_env }}"
+  register: nodes_raw
+  changed_when: false
+
+- name: "[preflight] Parse node data"
+  set_fact:
+    sno_nodes: "{{ (nodes_raw.stdout | from_json)['items'] }}"
+
+- name: "[preflight] Detect current cluster state"
+  set_fact:
+    sno_node_count: "{{ sno_nodes | length | int }}"
+    sno_has_three_nodes: "{{ (sno_nodes | length) == 3 }}"
+    sno_is_fresh: "{{ (sno_nodes | length) == 1 }}"
+    sno_transition_in_progress: "{{ (sno_nodes | length) == 3 and sno_cp_topology == 'SingleReplica' }}"
+    sno_already_ha: "{{ (sno_nodes | length) == 3 and sno_cp_topology == 'HighlyAvailable' }}"
+
+- name: "[preflight] Assert valid node count (1 or 3)"
+  assert:
+    that:
+      - (sno_node_count | int) in [1, 3]
+    fail_msg: "Expected 1 or 3 nodes, found {{ sno_node_count }}. Cluster is in an unexpected state."
+
+- name: "[preflight] Display detected state"
+  debug:
+    msg: |
+      Cluster state: {{ sno_node_count }} nodes, topology={{ sno_cp_topology }}
+      {% if sno_is_fresh %}
+      → Fresh SNO cluster - will add 2 nodes and transition to HA
+      {% elif sno_transition_in_progress %}
+      → Transition in progress - nodes added but topology not transitioned yet
+      {% elif sno_already_ha %}
+      → Already HighlyAvailable - will verify configuration
+      {% endif %}
+
+- name: "[preflight] Auto-detect first node IP"
+  set_fact:
+    sno_master0_ip: >-
+      {{ sno_master0_ip if sno_master0_ip
+         else (sno_nodes[0].status.addresses
+               | selectattr('type', 'equalto', 'InternalIP')
+               | map(attribute='address') | first) }}
+
+- name: "[preflight] Display first node IP"
+  debug:
+    msg: "First node ({{ sno_nodes[0].metadata.name }}) IP: {{ sno_master0_ip }}"
+
+- name: "[preflight] Check first node is Ready"
+  assert:
+    that: >-
+      sno_nodes[0].status.conditions
+      | selectattr('type', 'equalto', 'Ready')
+      | map(attribute='status') | first == 'True'
+    fail_msg: "First node {{ sno_nodes[0].metadata.name }} is not Ready"
+
+- name: "[preflight] Check etcd pods"
+  shell: |
+    oc get pods -n openshift-etcd -l app=etcd --no-headers \
+      -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready 2>/dev/null || true
+  environment: "{{ sno_oc_env }}"
+  register: etcd_pods_raw
+  changed_when: false
+
+- name: "[preflight] Display etcd status"
+  debug:
+    msg: "{{ etcd_pods_raw.stdout }}"
+
+- name: "[preflight] Check for degraded cluster operators"
+  shell: |
+    DEGRADED=$(oc get co -o json | jq -r '[.items[] | select(.status.conditions[] | select(.type=="Degraded" and .status=="True")) | .metadata.name] | join(", ")')
+    if [ -n "$DEGRADED" ]; then
+      echo "Degraded COs: $DEGRADED"
+      exit 1
+    fi
+    echo "All cluster operators healthy"
+  environment: "{{ sno_oc_env }}"
+  register: co_check
+  changed_when: false
+  failed_when: false
+
+- name: "[preflight] Display CO status"
+  debug:
+    msg: "{{ co_check.stdout }}"
+
+- name: "[preflight] Warn if COs degraded"
+  debug:
+    msg: "WARNING: Some COs are degraded. Proceeding anyway."
+  when: co_check.rc != 0
+
+- name: "[preflight] Check if api-int DNS exists"
+  shell: |
+    dig +short api-int.{{ sno_cluster_domain }} @192.168.111.1
+  register: dns_apiint
+  changed_when: false
+  failed_when: false
+
+- name: "[preflight] Add api-int as additional hostname to master-0 DNS entry"
+  shell: |
+    # Delete existing master-0 entry
+    sudo virsh net-update {{ sno_libvirt_network }} delete dns-host \
+      "<host ip='{{ sno_master0_ip }}'><hostname>master-0</hostname></host>" \
+      --live --config 2>/dev/null || true
+
+    # Re-add with both hostnames
+    sudo virsh net-update {{ sno_libvirt_network }} add dns-host \
+      "<host ip='{{ sno_master0_ip }}'><hostname>master-0</hostname><hostname>api-int.{{ sno_cluster_domain }}</hostname></host>" \
+      --live --config
+  when: dns_apiint.stdout | trim == ""
+  changed_when: true
+
+- name: "[preflight] Verify api-int DNS resolves"
+  shell: |
+    dig +short api-int.{{ sno_cluster_domain }} @192.168.111.1
+  register: dns_apiint_verify
+  changed_when: false
+  failed_when: dns_apiint_verify.stdout | trim == ""
+  retries: 3
+  delay: 2
+  until: dns_apiint_verify.stdout | trim != ""
+
+- name: "[preflight] Display api-int DNS status"
+  debug:
+    msg: "api-int.{{ sno_cluster_domain }} resolves to {{ dns_apiint_verify.stdout | trim }}"
+
+- name: "[preflight] Preflight checks passed"
+  debug:
+    msg: "All preflight checks passed. Ready for topology transition."

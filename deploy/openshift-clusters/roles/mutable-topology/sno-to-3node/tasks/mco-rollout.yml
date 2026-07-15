@@ -1,0 +1,12 @@
+---
+- name: "[mco] Display MCO rollout monitoring start"
+  debug:
+    msg: "Monitoring MCO rollout after topology transition (timeout: {{ sno_topology_mco_timeout_minutes }} min)"
+
+- name: "[mco] Wait for MCO rollout after topology transition"
+  include_tasks: poll-mcp.yml
+  vars:
+    mco_poll_purpose: "topology transition"
+    mco_poll_timeout_minutes: "{{ sno_topology_mco_timeout_minutes }}"
+    mco_poll_fail_on_timeout: false
+    mco_poll_auto_fix_drain: "{{ sno_auto_fix_drain | default(true) }}"

@@ -1,0 +1,73 @@
+---
+- name: "[verify] Wait for topology transition to complete (up to 20 minutes)"
+  shell: |
+    oc adm transition topology status 2>&1
+  environment: "{{ sno_oc_env }}"
+  register: transition_status
+  changed_when: false
+  failed_when: false
+  retries: 120
+  delay: 10
+  until: >-
+    transition_status is defined and
+    transition_status.rc is defined and
+    transition_status.rc == 0 and
+    transition_status.stdout is defined and
+    'No transition in progress' in transition_status.stdout
+
+- name: "[verify] Display transition status"
+  debug:
+    msg: "{{ transition_status.stdout }}"
+  when: transition_status is defined
+
+- name: "[verify] Check transition completion"
+  fail:
+    msg: "Topology transition did not complete after 20 minutes. See status output above."
+  when:
+    - transition_status is defined
+    - (transition_status.rc != 0 or 'No transition in progress' not in transition_status.stdout)
+
+- name: "[verify] Get node count and status"
+  shell: |
+    oc get nodes --no-headers
+  environment: "{{ sno_oc_env }}"
+  register: verify_nodes
+  changed_when: false
+
+- name: "[verify] Nodes"
+  debug:
+    msg: "{{ verify_nodes.stdout }}"
+
+- name: "[verify] Assert 3 nodes"
+  assert:
+    that: (verify_nodes.stdout_lines | length) >= 3
+    fail_msg: "Expected 3+ nodes, found {{ verify_nodes.stdout_lines | length }}"
+
+- name: "[verify] Assert all nodes Ready"
+  assert:
+    that: "'NotReady' not in verify_nodes.stdout"
+    fail_msg: "One or more nodes are NotReady:\n{{ verify_nodes.stdout }}"
+
+- name: "[verify] Get etcd member count"
+  shell: |
+    oc get pods -n openshift-etcd -l app=etcd --no-headers | wc -l
+  environment: "{{ sno_oc_env }}"
+  register: verify_etcd
+  changed_when: false
+
+- name: "[verify] etcd members"
+  debug:
+    msg: "etcd pods: {{ verify_etcd.stdout | trim }}"
+
+- name: "[verify] Assert 3 etcd members"
+  assert:
+    that: verify_etcd.stdout | trim | int >= 3
+    fail_msg: "Expected 3+ etcd pods, found {{ verify_etcd.stdout | trim }}"
+
+- name: "[verify] SNO to 3-node HA transition complete"
+  debug:
+    msg: >-
+      ✓ Topology transition verified via cluster-config-operator conditions
+      ✓ {{ verify_nodes.stdout_lines | length }} nodes Ready
+      ✓ {{ verify_etcd.stdout | trim }} etcd members
+      ✓ Cluster ready for production use

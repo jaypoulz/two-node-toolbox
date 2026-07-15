@@ -1,0 +1,72 @@
+---
+- name: "[clean] Stop and undefine new VMs"
+  shell: |
+    sudo virsh destroy {{ item.name }} 2>/dev/null || true
+    sudo virsh undefine {{ item.name }} --remove-all-storage --nvram 2>/dev/null || true
+  loop: "{{ sno_new_nodes }}"
+  failed_when: false
+  changed_when: true
+
+- name: "[clean] Remove disk images"
+  file:
+    path: "{{ sno_vm_image_dir }}/{{ item.name }}.qcow2"
+    state: absent
+  loop: "{{ sno_new_nodes }}"
+  become: true
+  failed_when: false
+
+- name: "[clean] Remove NVRAM files"
+  file:
+    path: "/var/lib/libvirt/qemu/nvram/{{ item.name }}_VARS.fd"
+    state: absent
+  loop: "{{ sno_new_nodes }}"
+  become: true
+  failed_when: false
+
+- name: "[clean] Remove per-node RHCOS ISOs"
+  file:
+    path: "/var/lib/libvirt/images/rhcos-{{ item.hostname }}.iso"
+    state: absent
+  loop: "{{ sno_new_nodes }}"
+  become: true
+  failed_when: false
+
+- name: "[clean] Remove entries from addnhosts"
+  lineinfile:
+    path: "{{ sno_addnhosts_path }}"
+    regexp: "^{{ item.ip }}\\s"
+    state: absent
+  loop: "{{ sno_new_nodes }}"
+  become: true
+  failed_when: false
+
+- name: "[clean] Remove hostname entries from addnhosts"
+  lineinfile:
+    path: "{{ sno_addnhosts_path }}"
+    regexp: "\\s{{ item.hostname }}\\.{{ sno_cluster_domain }}(\\s|$)"
+    state: absent
+  loop: "{{ sno_new_nodes }}"
+  become: true
+  failed_when: false
+
+- name: "[clean] Stop and disable HAProxy service"
+  systemd:
+    name: haproxy
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+
+- name: "[clean] Remove HAProxy configuration"
+  file:
+    path: /etc/haproxy/haproxy.cfg
+    state: absent
+  become: true
+  failed_when: false
+
+- name: "[clean] Cleanup complete"
+  debug:
+    msg: >-
+      Removed new resources: VMs {{ sno_new_nodes | map(attribute='name') | list | join(', ') }},
+      disk images, NVRAM files, ISOs, addnhosts entries, and HAProxy.
+      Use 'make full-clean' to remove the entire cluster including master-0 and libvirt network.

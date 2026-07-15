@@ -66,6 +66,9 @@ full-clean:
 clean-spoke:
 	@./openshift-clusters/scripts/clean-spoke.sh
 
+clean-mutable-topology:
+	@./openshift-clusters/scripts/clean-mutable-topology.sh $(EXTRA_ARGS)
+
 ssh:
 	@./aws-hypervisor/scripts/ssh.sh
 
@@ -143,6 +146,9 @@ baremetal-fencing-agent:
 baremetal-wizard:
 	@./openshift-clusters/scripts/baremetal-wizard.sh
 
+sno-to-3node:
+	@./openshift-clusters/scripts/sno-to-3node.sh $(EXTRA_ARGS)
+
 patch-nodes:
 	@./openshift-clusters/scripts/patch-nodes.sh
 get-tnf-logs:
@@ -184,6 +190,7 @@ help:
 	@echo "  fencing-assisted     - Deploy hub + spoke TNF cluster via assisted installer"
 	@echo "  sno-ipi              - Deploy Single Node OpenShift (SNO) IPI cluster (non-interactive)"
 	@echo "  sno-agent            - Deploy Single Node OpenShift (SNO) Agent cluster (non-interactive)"
+	@echo "  sno-to-3node         - Transition existing SNO cluster to 3-node HA (platform:none)"
 	@echo ""
 	@echo "OpenShift Cluster Management:"
 	@echo "  redeploy-cluster     - Redeploy OpenShift cluster using dev-scripts make redeploy"
@@ -192,6 +199,7 @@ help:
 	@echo "  clean                - Clean OpenShift cluster using dev-scripts clean target"
 	@echo "  full-clean           - Fully clean instance cache and OpenShift cluster using dev-scripts realclean target"
 	@echo "  clean-spoke          - Clean spoke cluster resources (VMs, network, auth) from assisted installer"
+	@echo "  clean-mutable-topology - Remove master-1/2 VMs, disks, DHCP/DNS entries (sno-to-3node cleanup)"
 	@echo "  patch-nodes          - Build resource-agents RPM and patch cluster nodes (default version: 4.11)"
 	@echo ""
 	@echo "Baremetal Adoption:"

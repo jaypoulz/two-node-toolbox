@@ -1,0 +1,154 @@
+---
+- name: "[boot] Check if RHCOS live ISO exists on hypervisor"
+  stat:
+    path: "/var/lib/libvirt/images/rhcos-live.iso"
+  register: iso_stat
+
+- name: "[boot] Find RHCOS live ISO from dev-scripts cache or release payload"
+  shell: |
+    DEVSCRIPTS_ISO=$(find /var/lib/libvirt/images -name 'rhcos-*-live*.iso' 2>/dev/null | head -1)
+    if [ -n "$DEVSCRIPTS_ISO" ]; then
+      echo "Using existing ISO: $DEVSCRIPTS_ISO"
+      sudo ln -sf "$DEVSCRIPTS_ISO" /var/lib/libvirt/images/rhcos-live.iso
+      exit 0
+    fi
+
+    CACHE_ISO=$(find {{ sno_dev_scripts_path }}/ -name 'rhcos-*-live*.iso' 2>/dev/null | head -1)
+    if [ -n "$CACHE_ISO" ]; then
+      echo "Using dev-scripts cached ISO: $CACHE_ISO"
+      sudo ln -sf "$CACHE_ISO" /var/lib/libvirt/images/rhcos-live.iso
+      exit 0
+    fi
+
+    echo "No cached ISO found, pulling from release payload..."
+    PULL_SECRET="{{ sno_dev_scripts_path }}/pull_secret.json"
+    RELEASE_IMAGE=$(KUBECONFIG="{{ sno_kubeconfig_resolved }}" oc get clusterversion version \
+      -o jsonpath='{.status.desired.image}')
+    echo "Release image: $RELEASE_IMAGE"
+    RHCOS_IMAGE=$(oc adm release info \
+      --image-for=machine-os-images \
+      -a "$PULL_SECRET" \
+      "$RELEASE_IMAGE")
+    echo "machine-os-images: $RHCOS_IMAGE"
+    oc image extract "$RHCOS_IMAGE" \
+      -a "$PULL_SECRET" \
+      --path /coreos/coreos-x86_64.iso:/tmp/ \
+      --confirm
+    sudo mv /tmp/coreos-x86_64.iso /var/lib/libvirt/images/rhcos-live.iso
+    echo "ISO pulled from release payload: /var/lib/libvirt/images/rhcos-live.iso"
+  when: not iso_stat.stat.exists and sno_rhcos_live_iso == ""
+
+- name: "[boot] Set ISO path"
+  set_fact:
+    sno_iso_path: "{{ sno_rhcos_live_iso if sno_rhcos_live_iso else '/var/lib/libvirt/images/rhcos-live.iso' }}"
+
+- name: "[boot] Read master.ign content"
+  slurp:
+    src: /tmp/master.ign
+  register: master_ign_content
+
+- name: "[boot] Set base64-encoded master.ign"
+  set_fact:
+    sno_master_ign_b64: "{{ master_ign_content.content }}"
+
+- name: "[boot] Generate auto-install ignition"
+  template:
+    src: auto-install.ign.j2
+    dest: /tmp/auto-install.ign
+    mode: '0644'
+
+- name: "[boot] Ensure coreos-installer is available"
+  shell: |
+    if ! command -v coreos-installer &>/dev/null; then
+      echo "coreos-installer not found, installing via dnf..."
+      sudo dnf install -y coreos-installer
+    else
+      echo "coreos-installer already installed: $(command -v coreos-installer)"
+    fi
+
+- name: "[boot] Create per-node ISO with embedded ignition"
+  shell: |
+    sudo cp {{ sno_iso_path }} /var/lib/libvirt/images/rhcos-{{ item.hostname }}.iso
+    sudo coreos-installer iso ignition embed -i /tmp/auto-install.ign /var/lib/libvirt/images/rhcos-{{ item.hostname }}.iso -f
+  loop: "{{ sno_new_nodes }}"
+
+- name: "[boot] Boot each VM with ignition-embedded ISO"
+  shell: |
+    VM_NAME="{{ item.name }}"
+    MAC="{{ sno_node_macs[item.hostname] }}"
+
+    sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+    sudo virsh undefine "$VM_NAME" --nvram 2>/dev/null || true
+
+    sudo virt-install \
+      --name "$VM_NAME" \
+      --ram {{ sno_vm_ram_mb }} \
+      --vcpus {{ sno_vm_vcpus }} \
+      --disk {{ sno_vm_image_dir }}/${VM_NAME}.qcow2,bus=virtio \
+      --network network={{ sno_libvirt_network }},model=virtio,mac=${MAC} \
+      --cdrom /var/lib/libvirt/images/rhcos-{{ item.hostname }}.iso \
+      --os-variant rhel9.0 \
+      --graphics none \
+      --noautoconsole \
+      --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash,nvram_template=/usr/share/edk2/ovmf/OVMF_VARS.fd,loader_secure=no \
+      --boot hd,cdrom \
+      --tpm none
+  loop: "{{ sno_new_nodes }}"
+
+- name: "[boot] Verify VMs are running (initial install boot)"
+  shell: |
+    sudo virsh domstate {{ item.name }}
+  register: vm_state
+  loop: "{{ sno_new_nodes }}"
+  changed_when: false
+  failed_when: "'running' not in vm_state.stdout"
+
+- name: "[boot] Wait for coreos-installer to complete (VM will power off)"
+  # coreos-installer runs ExecStartPost=systemctl reboot, but RHCOS live issues
+  # an ACPI poweroff rather than a reset. libvirt fires on_poweroff=destroy so
+  # the VM shuts off. We poll until shut off, then boot from disk below.
+  shell: |
+    for i in $(seq 50); do
+      STATE=$(sudo virsh domstate {{ item.name }} 2>/dev/null || echo "unknown")
+      if echo "$STATE" | grep -q "shut off"; then
+        echo "{{ item.name }} shut off after $((i * 20))s - install complete"
+        exit 0
+      fi
+      sleep 20
+    done
+    echo "Timeout: {{ item.name }} did not shut off within 1000s"
+    exit 1
+  loop: "{{ sno_new_nodes }}"
+  changed_when: false
+
+- name: "[boot] Remove CDROM from boot order after install"
+  # Prevent coreos-installer loop: strip the cdrom boot entry so UEFI only
+  # tries the hard disk on subsequent boots.
+  shell: |
+    TMPXML=$(mktemp /tmp/vm-XXXXXX.xml)
+    sudo virsh dumpxml {{ item.name }} > "$TMPXML"
+    sudo sed -i "/<boot dev='cdrom'\/>/d" "$TMPXML"
+    sudo virsh define "$TMPXML"
+    sudo rm -f "$TMPXML"
+  loop: "{{ sno_new_nodes }}"
+  changed_when: true
+
+- name: "[boot] Start VMs to boot from installed RHCOS"
+  shell: |
+    sudo virsh start {{ item.name }}
+  loop: "{{ sno_new_nodes }}"
+  changed_when: true
+
+- name: "[boot] Verify VMs are running from installed disk"
+  shell: |
+    sudo virsh domstate {{ item.name }}
+  register: vm_state_disk
+  loop: "{{ sno_new_nodes }}"
+  changed_when: false
+  failed_when: "'running' not in vm_state_disk.stdout"
+
+- name: "[boot] VMs booted with RHCOS"
+  debug:
+    msg: >-
+      {{ sno_new_nodes | length }} VMs installed and started from disk.
+      Waiting for nodes to join the cluster...
