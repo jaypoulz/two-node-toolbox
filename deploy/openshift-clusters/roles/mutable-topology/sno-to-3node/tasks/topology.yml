@@ -7,10 +7,87 @@
   changed_when: false
   failed_when: false
 
-- name: "[topology] Skip topology transition if command not available"
-  debug:
-    msg: "oc adm transition topology command not available - skipping topology transition tasks"
+- name: "[topology] Get CCO TopologyTransitionControllerProgressing status"
+  shell: oc get config.operator.openshift.io/cluster -o json 2>/dev/null | jq -r '.status.conditions[] | select(.type=="TopologyTransitionControllerProgressing") | .status' || echo "Unknown"
+  environment: "{{ sno_oc_env }}"
+  register: cco_progressing
+  changed_when: false
+  failed_when: false
   when: topology_cmd_check.rc != 0
+
+- name: "[topology] Get Infrastructure spec.controlPlaneTopology"
+  shell: oc get infrastructure cluster -o json 2>/dev/null | jq -r '.spec.controlPlaneTopology // ""'
+  environment: "{{ sno_oc_env }}"
+  register: infra_spec_topo
+  changed_when: false
+  failed_when: false
+  when: topology_cmd_check.rc != 0
+
+- name: "[topology] Get Infrastructure status.controlPlaneTopology"
+  shell: oc get infrastructure cluster -o json 2>/dev/null | jq -r '.status.controlPlaneTopology // ""'
+  environment: "{{ sno_oc_env }}"
+  register: infra_status_topo
+  changed_when: false
+  failed_when: false
+  when: topology_cmd_check.rc != 0
+
+- name: "[topology] Determine CCO transition result"
+  set_fact:
+    cco_transition_result: >-
+      {%- if infra_status_topo.stdout == "HighlyAvailable" and (infra_spec_topo.stdout == "" or infra_spec_topo.stdout == "HighlyAvailable") -%}
+      complete
+      {%- elif cco_progressing.stdout == "False" and infra_status_topo.stdout != infra_spec_topo.stdout -%}
+      failed
+      {%- else -%}
+      unknown
+      {%- endif -%}
+  when: topology_cmd_check.rc != 0
+
+- name: "[topology] Fail if transition needed but command unavailable"
+  fail:
+    msg: |
+      The 'oc adm transition topology' command is not available in this OpenShift version.
+
+      Cluster status:
+        spec.controlPlaneTopology: {{ infra_spec_topo.stdout | default('unknown') }}
+        status.controlPlaneTopology: {{ infra_status_topo.stdout | default('unknown') }}
+        CCO TopologyTransitionControllerProgressing: {{ cco_progressing.stdout | default('unknown') }}
+
+      This cluster requires topology transition but the command is not available.
+      Required: OpenShift with oc adm transition topology support.
+  when:
+    - topology_cmd_check.rc != 0
+    - cco_transition_result is defined
+    - cco_transition_result == "failed"
+
+- name: "[topology] Skip transition - already complete (verified via CCO)"
+  debug:
+    msg: |
+      oc adm transition topology command not available, but cluster is already HighlyAvailable.
+      Verified via Infrastructure CR status.
+      Skipping topology transition tasks.
+  when:
+    - topology_cmd_check.rc != 0
+    - cco_transition_result is defined
+    - cco_transition_result == "complete"
+
+- name: "[topology] Fail if transition status is unknown (command unavailable)"
+  fail:
+    msg: |
+      The 'oc adm transition topology' command is not available and cluster state cannot be determined.
+
+      Cluster status:
+        spec.controlPlaneTopology: {{ infra_spec_topo.stdout | default('unknown') }}
+        status.controlPlaneTopology: {{ infra_status_topo.stdout | default('unknown') }}
+        CCO TopologyTransitionControllerProgressing: {{ cco_progressing.stdout | default('unknown') }}
+
+      Cannot determine if transition is safe to proceed. Either:
+      1. Manually verify cluster state and topology configuration
+      2. Install oc version with 'oc adm transition topology' support
+  when:
+    - topology_cmd_check.rc != 0
+    - cco_transition_result is defined
+    - cco_transition_result == "unknown"
 
 - name: "[topology] Display transition status"
   debug:
@@ -25,7 +102,6 @@
   environment: "{{ sno_oc_env }}"
   register: preflight_check
   changed_when: false
-  failed_when: false
   retries: 120
   delay: 10
   until: >-

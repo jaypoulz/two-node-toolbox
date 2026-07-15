@@ -5,7 +5,17 @@
   environment: "{{ sno_oc_env }}"
   register: delete_dnsmasq_mc
   changed_when: "'deleted' in delete_dnsmasq_mc.stdout"
-  failed_when: false
+  retries: 5
+  delay: 5
+  until: delete_dnsmasq_mc.rc == 0
+
+- name: "[dns] Display dnsmasq MC deletion result"
+  debug:
+    msg: |
+      stdout: {{ delete_dnsmasq_mc.stdout }}
+      stderr: {{ delete_dnsmasq_mc.stderr }}
+      rc: {{ delete_dnsmasq_mc.rc }}
+      changed: {{ delete_dnsmasq_mc.changed }}
 
 - name: "[dns] Display dnsmasq MC deletion status"
   debug:
@@ -37,7 +47,6 @@
   environment: "{{ sno_oc_env }}"
   register: dns_verify
   changed_when: false
-  failed_when: false
   when: delete_dnsmasq_mc.changed
 
 - name: "[dns] DNS transition complete"

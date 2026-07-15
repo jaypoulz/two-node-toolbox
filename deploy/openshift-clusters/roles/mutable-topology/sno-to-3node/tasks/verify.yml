@@ -48,9 +48,10 @@
     that: "'NotReady' not in verify_nodes.stdout"
     fail_msg: "One or more nodes are NotReady:\n{{ verify_nodes.stdout }}"
 
-- name: "[verify] Get etcd member count"
+- name: "[verify] Get healthy etcd member count"
   shell: |
-    oc get pods -n openshift-etcd -l app=etcd --no-headers | wc -l
+    oc get pods -n openshift-etcd -l app=etcd -o json | \
+      jq '[.items[] | select(.status.phase == "Running" and all(.status.containerStatuses[]?; .ready == true))] | length'
   environment: "{{ sno_oc_env }}"
   register: verify_etcd
   changed_when: false
