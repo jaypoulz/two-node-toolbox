@@ -129,10 +129,13 @@
           The cluster is ready for topology transition. To complete manually:
             $ oc adm transition topology --control-plane=HighlyAvailable --infrastructure=HighlyAvailable --confirm
 
-          To resume and complete the transition automatically, rerun:
+          To resume and complete the transition automatically, rerun WITHOUT the stop flag:
             $ make sno-to-3node
 
           Playbook stopped as requested (stop_before_transition_confirm=true)
+
+          Tip: Pass Ansible extra vars to make using EXTRA_ARGS:
+            make sno-to-3node EXTRA_ARGS="-e stop_before_transition_confirm=true"
 
     - name: "[topology] End playbook at staged state"
       meta: end_play
