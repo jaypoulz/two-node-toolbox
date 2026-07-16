@@ -1,18 +1,68 @@
 ---
+- name: "[haproxy] Check if HAProxy is already configured for this cluster"
+  shell: |
+    # Check if haproxy is running
+    systemctl is-active haproxy 2>/dev/null || exit 1
+
+    # Check if config has OpenShift-specific frontends (stable marker)
+    grep -q "frontend api_server" /etc/haproxy/haproxy.cfg 2>/dev/null || exit 1
+    grep -q "frontend ingress_http" /etc/haproxy/haproxy.cfg 2>/dev/null || exit 1
+
+    # Check if config has all 3 master backends
+    MASTER_COUNT=$(grep -c "server master-[0-2].*:6443 check" /etc/haproxy/haproxy.cfg 2>/dev/null || echo 0)
+    [ "$MASTER_COUNT" -eq 3 ] || exit 1
+
+    # All checks passed
+    exit 0
+  register: haproxy_configured_check
+  changed_when: false
+  failed_when: false
+
+- name: "[haproxy] Check if DNS migration is complete"
+  shell: |
+    # Check /etc/hosts has no stale apps entries
+    ! grep -q "apps\.{{ sno_cluster_domain | regex_escape() }}" /etc/hosts 2>/dev/null || exit 1
+
+    # Check libvirt network has wildcard DNS for apps
+    virsh net-dumpxml {{ sno_libvirt_network }} 2>/dev/null | \
+      grep -q "address=/.apps.{{ sno_cluster_domain | regex_escape() }}" || exit 1
+
+    # All checks passed
+    exit 0
+  register: dns_migration_check
+  changed_when: false
+  failed_when: false
+
+- name: "[haproxy] Set migration completion flag"
+  set_fact:
+    haproxy_migration_complete: "{{ haproxy_configured_check.rc == 0 and dns_migration_check.rc == 0 }}"
+
+- name: "[haproxy] Display HAProxy and DNS migration status"
+  debug:
+    msg: |
+      HAProxy: {{ 'configured' if haproxy_configured_check.rc == 0 else 'needs configuration' }}
+      DNS migration: {{ 'complete' if dns_migration_check.rc == 0 else 'incomplete' }}
+      {{ 'Skipping HAProxy reconfiguration' if haproxy_migration_complete else 'Running setup tasks' }}
+
 - name: "[haproxy] Check if haproxy is already installed"
   shell: rpm -q haproxy
   register: haproxy_check
   changed_when: false
   failed_when: false
+  when: not haproxy_migration_complete
 
 - name: "[haproxy] Install haproxy package on hypervisor"
   package:
     name: haproxy
     state: present
   become: true
-  when: haproxy_check.rc != 0
+  when:
+    - not haproxy_migration_complete
+    - haproxy_check is defined
+    - haproxy_check.rc != 0
 
 - name: "[haproxy] Create haproxy runtime directory"
+  when: not haproxy_migration_complete
   file:
     path: /run/haproxy
     state: directory
@@ -22,6 +72,7 @@
   become: true
 
 - name: "[haproxy] Create haproxy configuration for OpenShift"
+  when: not haproxy_migration_complete
   copy:
     dest: /etc/haproxy/haproxy.cfg
     content: |
@@ -98,6 +149,7 @@
   register: haproxy_config
 
 - name: "[haproxy] Allow HAProxy to bind to OpenShift ports in SELinux"
+  when: not haproxy_migration_complete
   shell: |
     if ! semanage port -l | grep -q "^http_port_t.*tcp.*{{ item }}"; then
       semanage port -a -t http_port_t -p tcp {{ item }}
@@ -113,6 +165,7 @@
   changed_when: "'CHANGED' in selinux_port_config.stdout"
 
 - name: "[haproxy] Check existing firewall rules (public zone)"
+  when: not haproxy_migration_complete
   shell: |
     firewall-cmd --zone=public --list-ports | grep -q "{{ item }}"
   loop:
@@ -127,16 +180,20 @@
 
 - name: "[haproxy] Configure firewall for HAProxy ports"
   firewalld:
+    zone: public
     port: "{{ item.item }}"
     permanent: true
     state: enabled
     immediate: true
   loop: "{{ fw_public_check.results }}"
-  when: item.rc != 0
+  when:
+    - not haproxy_migration_complete
+    - item.rc != 0
   become: true
   failed_when: false
 
 - name: "[haproxy] Check existing firewall rules (libvirt zone)"
+  when: not haproxy_migration_complete
   shell: |
     firewall-cmd --zone=libvirt --list-ports | grep -q "{{ item }}"
   loop:
@@ -157,11 +214,14 @@
     state: enabled
     immediate: true
   loop: "{{ fw_libvirt_check.results }}"
-  when: item.rc != 0
+  when:
+    - not haproxy_migration_complete
+    - item.rc != 0
   become: true
   failed_when: false
 
 - name: "[haproxy] Enable and start haproxy service"
+  when: not haproxy_migration_complete
   systemd:
     name: haproxy
     state: started
@@ -174,15 +234,19 @@
     name: haproxy
     state: restarted
   become: true
-  when: haproxy_config.changed
+  when:
+    - not haproxy_migration_complete
+    - haproxy_config.changed
 
 - name: "[haproxy] Wait for haproxy to be ready"
+  when: not haproxy_migration_complete
   wait_for:
     port: 6443
     host: 192.168.111.1
     timeout: 30
 
 - name: "[haproxy] Remove stale apps entries from /etc/hosts before DNS reconfiguration"
+  when: not haproxy_migration_complete
   lineinfile:
     path: /etc/hosts
     regexp: "apps\\.{{ sno_cluster_domain | regex_escape() }}"
@@ -193,15 +257,19 @@
 - name: "[haproxy] Display /etc/hosts cleanup"
   debug:
     msg: "✓ Removed stale apps routes from /etc/hosts (preparing for wildcard DNS)"
-  when: hosts_cleanup.changed
+  when:
+    - not haproxy_migration_complete
+    - hosts_cleanup.changed
 
 - name: "[haproxy] Generate libvirt network config for 3-node HA"
+  when: not haproxy_migration_complete
   template:
     src: libvirt-network-3node.xml.j2
     dest: /tmp/libvirt-network-3node.xml
     mode: '0644'
 
 - name: "[haproxy] Update libvirt network with HAProxy DNS configuration"
+  when: not haproxy_migration_complete
   shell: |
     sudo virsh net-destroy {{ sno_libvirt_network }} 2>/dev/null || true
     sudo virsh net-undefine {{ sno_libvirt_network }}
@@ -239,6 +307,8 @@
   become: true
   failed_when: false
   register: nm_dnsmasq_config
+  # Note: This file is created/managed by dev-scripts and cleaned by 'make full-clean' (realclean target).
+  # The sno-to-3node role only updates the API entry to point to HAProxy; no cleanup needed in clean.yml.
 
 - name: "[haproxy] Restart NetworkManager to flush DNS cache"
   systemd:

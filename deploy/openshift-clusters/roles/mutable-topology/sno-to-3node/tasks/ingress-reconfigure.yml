@@ -6,7 +6,12 @@
 - name: "[ingress] Check current IngressController replica configuration"
   shell:
     cmd: |
-      REPLICAS=$(oc get ingresscontroller/default -n openshift-ingress-operator -o json 2>/dev/null | jq -r '.spec.replicas // empty')
+      if ! IC_JSON=$(oc get ingresscontroller/default -n openshift-ingress-operator -o json); then
+        echo "ERROR: Failed to get IngressController resource"
+        exit 1
+      fi
+
+      REPLICAS=$(echo "$IC_JSON" | jq -r '.spec.replicas // empty')
       echo "replicas=${REPLICAS}"
 
       # Empty means field not set - defaults to 2 in HA mode, so it's already correct
@@ -31,6 +36,27 @@
   debug:
     msg: "{{ ingress_check.stdout_lines }}"
 
+- name: "[ingress] Delete ingress-operator pod to force Infrastructure resync"
+  shell: |
+    oc delete pod -n openshift-ingress-operator -l name=ingress-operator
+  environment: "{{ sno_oc_env }}"
+  register: delete_operator_pod
+  changed_when: delete_operator_pod.rc == 0
+  failed_when: false
+  when: "'needs_deletion=true' in ingress_check.stdout"
+
+- name: "[ingress] Wait for ingress-operator pod to restart"
+  shell: |
+    oc get pods -n openshift-ingress-operator -l name=ingress-operator -o json | \
+      jq -e '.items[] | select(.status.phase == "Running" and all(.status.containerStatuses[]?; .ready == true))'
+  environment: "{{ sno_oc_env }}"
+  register: operator_pod_check
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: operator_pod_check.rc == 0
+  when: "'needs_deletion=true' in ingress_check.stdout"
+
 - name: "[ingress] Delete IngressController to trigger recreation with HA defaults"
   shell: |
     oc delete ingresscontroller/default -n openshift-ingress-operator
@@ -53,7 +79,12 @@
 - name: "[ingress] Verify IngressController has correct replicas for HA"
   shell:
     cmd: |
-      REPLICAS=$(oc get ingresscontroller/default -n openshift-ingress-operator -o json 2>/dev/null | jq -r '.spec.replicas // empty')
+      if ! IC_JSON=$(oc get ingresscontroller/default -n openshift-ingress-operator -o json); then
+        echo "ERROR: Failed to get IngressController resource"
+        exit 1
+      fi
+
+      REPLICAS=$(echo "$IC_JSON" | jq -r '.spec.replicas // empty')
       echo "replicas=${REPLICAS}"
 
       # Empty or >= 2 is correct for HA
@@ -66,6 +97,10 @@
         echo "ERROR: IngressController still has replicas=1 after HA transition"
         exit 1
       fi
+
+      # If REPLICAS is non-numeric or invalid
+      echo "ERROR: Invalid replica value: ${REPLICAS}"
+      exit 1
   environment: "{{ sno_oc_env }}"
   register: ingress_config
   changed_when: false

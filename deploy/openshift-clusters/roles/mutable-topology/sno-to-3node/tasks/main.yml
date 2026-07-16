@@ -9,9 +9,10 @@
   changed_when: false
   failed_when: false
 
-- name: "[main] Check if etcd has 3+ members"
+- name: "[main] Check if etcd has 3+ healthy members"
   shell: |
-    oc get pods -n openshift-etcd -l app=etcd --no-headers 2>/dev/null | wc -l
+    oc get pods -n openshift-etcd -l app=etcd -o json 2>/dev/null | \
+      jq '[.items[] | select(.status.phase == "Running" and all(.status.containerStatuses[]?; .ready == true))] | length'
   environment: "{{ sno_oc_env }}"
   register: etcd_count_check
   changed_when: false

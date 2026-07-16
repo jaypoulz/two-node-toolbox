@@ -5,7 +5,9 @@
   environment: "{{ sno_oc_env }}"
   register: delete_dnsmasq_mc
   changed_when: "'deleted' in delete_dnsmasq_mc.stdout"
-  failed_when: false
+  retries: 5
+  delay: 5
+  until: delete_dnsmasq_mc.rc == 0
 
 - name: "[dns] Display dnsmasq MC deletion status"
   debug:
@@ -21,24 +23,72 @@
     mco_poll_check_rendered_config: false  # Standalone MC deletion - generation/config won't change
   when: delete_dnsmasq_mc.changed
 
-- name: "[dns] Verify DNS configuration on nodes"
+- name: "[dns] Check if resolv.conf has stale dnsmasq entries"
   shell: |
-    # Check that nodes are using cluster DNS, not dnsmasq
-    oc get nodes -o json | jq -r '.items[].metadata.name' | while read node; do
-      RESOLV=$(oc debug node/$node -- chroot /host cat /etc/resolv.conf 2>/dev/null | grep "^nameserver" | head -1)
-      echo "$node: $RESOLV"
+    # Check if any node has 192.168.111.80 in resolv.conf
+    FOUND=0
+    for node in $(oc get nodes -o json | jq -r '.items[].metadata.name'); do
+      if oc debug node/$node -- chroot /host grep -q "192.168.111.80" /etc/resolv.conf 2>/dev/null; then
+        echo "$node: has stale dnsmasq entry"
+        FOUND=1
+      fi
+    done
+    exit $FOUND
+  environment: "{{ sno_oc_env }}"
+  register: stale_resolv_check
+  changed_when: false
+  failed_when: false
 
-      # Verify NOT using 192.168.111.80 (dnsmasq on master-0)
-      if echo "$RESOLV" | grep -q "192.168.111.80"; then
-        echo "ERROR: Node $node still using dnsmasq (192.168.111.80)"
-        exit 1
+- name: "[dns] Display stale resolv.conf check result"
+  debug:
+    msg: |
+      {% if stale_resolv_check.rc == 1 %}
+      Stale dnsmasq entries found on nodes:
+      {{ stale_resolv_check.stdout }}
+      {% else %}
+      All nodes have clean resolv.conf (no stale dnsmasq entries)
+      {% endif %}
+
+- name: "[dns] Force NetworkManager to regenerate resolv.conf on nodes with stale entries"
+  shell: |
+    # Remove stale resolv.conf and reload NetworkManager to regenerate it
+    for node in $(oc get nodes -o json | jq -r '.items[].metadata.name'); do
+      if oc debug node/$node -- chroot /host grep -q "192.168.111.80" /etc/resolv.conf 2>/dev/null; then
+        echo "Regenerating resolv.conf on $node (had stale dnsmasq entry)"
+        oc debug node/$node -- chroot /host bash -c 'rm -f /etc/resolv.conf && nmcli general reload' 2>/dev/null
       fi
     done
   environment: "{{ sno_oc_env }}"
+  changed_when: true
+  when: stale_resolv_check.rc == 1
+
+- name: "[dns] Verify dnsmasq service stopped and resolv.conf clean on all nodes"
+  shell: |
+    # Check all nodes to ensure dnsmasq service is stopped and resolv.conf is clean
+    FAILED=0
+    for node in $(oc get nodes -o json | jq -r '.items[].metadata.name'); do
+      STATUS=$(oc debug node/$node -- chroot /host systemctl is-active dnsmasq 2>/dev/null || echo "inactive")
+      if [ "$STATUS" = "active" ]; then
+        echo "ERROR: dnsmasq still active on $node"
+        FAILED=1
+        continue
+      fi
+
+      if oc debug node/$node -- chroot /host grep -q "192.168.111.80" /etc/resolv.conf 2>/dev/null; then
+        echo "ERROR: $node still has stale dnsmasq entry in resolv.conf"
+        FAILED=1
+        continue
+      fi
+
+      echo "$node: dnsmasq $STATUS, resolv.conf clean"
+    done
+    exit $FAILED
+  environment: "{{ sno_oc_env }}"
   register: dns_verify
   changed_when: false
-  failed_when: false
-  when: delete_dnsmasq_mc.changed
+  retries: 5
+  delay: 10
+  until: dns_verify.rc == 0
 
 - name: "[dns] DNS transition complete"
   debug:
@@ -46,7 +96,7 @@
       {% if delete_dnsmasq_mc.changed %}
       ✓ SNO dnsmasq MachineConfig removed
       ✓ MCO rollout completed
-      ✓ Nodes using correct DNS resolvers
+      ✓ dnsmasq service stopped (DNS now handled by HAProxy)
       {% else %}
       ✓ SNO dnsmasq MachineConfig already removed (skipped MCO wait)
       {% endif %}

@@ -71,17 +71,36 @@
       → Already HighlyAvailable - will verify configuration
       {% endif %}
 
-- name: "[preflight] Auto-detect first node IP"
+- name: "[preflight] Filter control plane nodes and gather IPs in stable order"
   set_fact:
-    sno_master0_ip: >-
-      {{ sno_master0_ip if sno_master0_ip
-         else (sno_nodes[0].status.addresses
-               | selectattr('type', 'equalto', 'InternalIP')
-               | map(attribute='address') | first) }}
+    sno_cp_ips: >-
+      {{ sno_nodes
+         | json_query('[?metadata.labels."node-role.kubernetes.io/control-plane" != `null`]')
+         | sort(attribute='metadata.name')
+         | map(attribute='status.addresses')
+         | map('selectattr', 'type', 'equalto', 'InternalIP')
+         | map('map', attribute='address')
+         | map('first')
+         | list }}
 
-- name: "[preflight] Display first node IP"
+- name: "[preflight] Assert we have control plane IPs"
+  assert:
+    that:
+      - sno_cp_ips | length >= 1
+      - sno_cp_ips | length <= 3
+    fail_msg: "Expected 1-3 control plane IPs, found {{ sno_cp_ips | length }}"
+
+- name: "[preflight] Assign control plane IPs to master variables"
+  set_fact:
+    sno_master0_ip: "{{ sno_cp_ips[0] }}"
+    sno_master1_ip: "{{ sno_cp_ips[1] if sno_cp_ips | length > 1 else '192.168.111.21' }}"
+    sno_master2_ip: "{{ sno_cp_ips[2] if sno_cp_ips | length > 2 else '192.168.111.22' }}"
+
+- name: "[preflight] Display control plane IPs"
   debug:
-    msg: "First node ({{ sno_nodes[0].metadata.name }}) IP: {{ sno_master0_ip }}"
+    msg: >-
+      Control plane IPs (sorted by name): {{ sno_cp_ips | join(', ') }}
+      (master0={{ sno_master0_ip }}, master1={{ sno_master1_ip }}, master2={{ sno_master2_ip }})
 
 - name: "[preflight] Check first node is Ready"
   assert:
