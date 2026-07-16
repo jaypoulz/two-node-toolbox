@@ -431,33 +431,33 @@ generate_baremetal_config() {
         echo "export MANAGE_INT_BRIDGE=n"
         echo "export AGENT_E2E_TEST_SCENARIO=\"TNF_IPV4_DHCP\""
 
-        # BAREMETAL_IPS is required — dev-scripts crashes under set -u without it
+        # AGENT_BAREMETAL_IPS is required — dev-scripts agent pipeline needs node IPs
         local ip_list=""
         for ((i = 0; i < ${#NODE_IPS[@]}; i++)); do
             [[ -z "${NODE_IPS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': node_ip is required for baremetal deploy"
             [[ -n "${ip_list}" ]] && ip_list+=","
             ip_list+="${NODE_IPS[$i]}"
         done
-        echo "export BAREMETAL_IPS=\"${ip_list}\""
+        echo "export AGENT_BAREMETAL_IPS=\"${ip_list}\""
 
-        # BAREMETAL_API_VIP is required — set_api_and_ingress_vip() needs it
+        # BAREMETAL_API_VIP is platform-level (used by both IPI and ABI in network.sh)
         [[ -z "${API_VIP}" ]] && die "api_vip is required in [baremetal_network] for baremetal deploy"
         [[ -z "${ISO_URL}" ]] && die "iso_url is required in [baremetal_network] for baremetal deploy"
         echo ""
         echo "# Baremetal network config"
         echo "export BAREMETAL_API_VIP=\"${API_VIP}\""
-        echo "export BAREMETAL_ISO_SERVER=\"${ISO_URL}\""
+        echo "export AGENT_BAREMETAL_ISO_SERVER=\"${ISO_URL}\""
         [[ -n "${MACHINE_NETWORK}" ]] && echo "export EXTERNAL_SUBNET_V4=\"${MACHINE_NETWORK}\""
         [[ -n "${INGRESS_VIP}" ]] && echo "export BAREMETAL_INGRESS_VIP=\"${INGRESS_VIP}\""
 
-        # BAREMETAL_MACS is required — agent-config needs data NIC MACs for hostname mapping
+        # AGENT_BAREMETAL_MACS is required — agent-config needs data NIC MACs for hostname mapping
         local mac_list=""
         for ((i = 0; i < ${#NODE_DATA_MACS[@]}; i++)); do
             [[ -z "${NODE_DATA_MACS[$i]}" ]] && die "Node '${NODE_NAMES[$i]}': data_mac is required for baremetal deploy"
             [[ -n "${mac_list}" ]] && mac_list+=","
             mac_list+="${NODE_DATA_MACS[$i]}"
         done
-        echo "export BAREMETAL_MACS=\"${mac_list}\""
+        echo "export AGENT_BAREMETAL_MACS=\"${mac_list}\""
     } > "${output_file}"
 
     info "  → ${output_file}"
