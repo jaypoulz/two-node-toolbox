@@ -112,6 +112,25 @@ function print_proxy_instructions() {
     echo "3. Access the cluster console if needed"
 }
 
+function clear_cluster_state() {
+  local cluster_dir="${COMMON_DIR}/openshift-clusters"
+  local state_file
+  state_file="$(get_shared_dir)/cluster-vm-state.json"
+
+  rm -f "$state_file"
+  rm -f "${cluster_dir}/proxy.env"
+  rm -f "${cluster_dir}/kubeconfig"
+  rm -f "${cluster_dir}/kubeadmin-password"
+
+  local inventory="${cluster_dir}/inventory.ini"
+  if [[ -f "$inventory" ]]; then
+    sed -i '/^\[cluster_vms\]/,/^\[/{/^\[cluster_vms\]/d;/^\[/!d}' "$inventory"
+    sed -i '/^\[cluster_vms:vars\]/,/^\[/{/^\[cluster_vms:vars\]/d;/^\[/!d}' "$inventory"
+  fi
+
+  msg_info "Local cluster state cleared."
+}
+
 function get_ami_arch() {
   local arch="${RHEL_HOST_ARCHITECTURE}"
   if [[ "${arch}" == "aarch64" ]]; then
