@@ -33,13 +33,19 @@ echo "Running Ansible clean playbook with complete=true option..."
 cd "${DEPLOY_DIR}/openshift-clusters"
 
 # Run the clean playbook with complete=true (runs 'realclean' target)
-if ansible-playbook clean.yml -i inventory.ini --extra-vars "complete=true"; 
-then
+set +e
+ansible-playbook clean.yml -i inventory.ini --extra-vars "complete=true"
+rc=$?
+set -e
+
+clear_cluster_state
+
+if [[ $rc -eq 0 ]]; then
     echo ""
     echo "✓ OpenShift cluster full clean completed successfully!"
-    echo "The cluster has been completely cleaned using the 'realclean' target."
 else
-    echo "Error: OpenShift cluster full clean failed!"
-    echo "Check the Ansible logs for more details."
-    exit 1
-fi 
+    echo "Remote cluster full clean reported errors (exit code $rc)."
+    echo "Local cluster state has been cleared."
+fi
+
+exit $rc 
