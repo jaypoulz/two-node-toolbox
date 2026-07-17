@@ -36,9 +36,9 @@ cd "${DEPLOY_DIR}/openshift-clusters"
 set +e
 ansible-playbook clean.yml -i inventory.ini --extra-vars "complete=true"
 rc=$?
-set -e
 
 clear_cluster_state
+set -e
 
 if [[ $rc -eq 0 ]]; then
     echo ""
