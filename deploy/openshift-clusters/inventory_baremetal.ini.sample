@@ -16,7 +16,7 @@
 #   boot_mac   - (optional) MAC address of the NIC used for PXE boot
 #                If omitted, the adopt script attempts Redfish discovery.
 #   data_mac   - MAC address of the data NIC (for agent-config hostname mapping)
-#                May differ from boot_mac on multi-NIC servers. Emitted as BAREMETAL_MACS.
+#                May differ from boot_mac on multi-NIC servers. Emitted as AGENT_BAREMETAL_MACS.
 #   node_ip    - Static IP address for this node on the machine network
 #
 # The hostname (first field) becomes the node name in ironic_nodes.json.
