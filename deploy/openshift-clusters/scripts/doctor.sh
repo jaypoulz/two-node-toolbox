@@ -323,8 +323,8 @@ for topology in arbiter fencing sno; do
     fi
   fi
 
-  # CI token live check: only when CI_TOKEN is set and the release image is on
-  # the CI registry (same condition as install-dev/tasks/config.yml)
+  # CI token registry check: only when CI_TOKEN is set and the release image
+  # is on the CI registry (same condition as install-dev/tasks/config.yml)
   CI_TOKEN="$(sed -nE 's/^export CI_TOKEN="([^"]+)".*/\1/p' "${CONFIG_FILE}" | head -1)"
   RELEASE_REGISTRY="$(sed -nE 's|^export OPENSHIFT_RELEASE_IMAGE="?([^/"]+).*|\1|p' "${CONFIG_FILE}" | head -1)"
   if [[ -n "${CI_TOKEN}" && "${RELEASE_REGISTRY}" == "registry.ci.openshift.org" ]]; then
@@ -343,6 +343,28 @@ for topology in arbiter fencing sno; do
         check_pass "CI token in config_${topology}.sh accepted by ${RELEASE_REGISTRY}"
       else
         check_warn "CI token check: unexpected HTTP ${HTTP_CODE} from ${RELEASE_REGISTRY}"
+      fi
+    fi
+  fi
+
+  if [[ -n "${CI_TOKEN}" ]]; then
+    CI_SERVER="api.ci.l2s4.p1.openshiftapps.com"
+    if ! command -v curl >/dev/null 2>&1; then
+      check_warn "CI API token check skipped: 'curl' not found on PATH"
+    else
+      HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+        -H "Authorization: Bearer ${CI_TOKEN}" \
+        "https://${CI_SERVER}:6443/apis/user.openshift.io/v1/users/~")"
+      CURL_RC=$?
+      if [[ ${CURL_RC} -ne 0 ]]; then
+        check_warn "CI API token check: curl failed (exit ${CURL_RC}) reaching ${CI_SERVER}"
+      elif [[ "${HTTP_CODE}" == "401" ]]; then
+        check_fail "CI token in config_${topology}.sh is expired against the CI cluster API (${CI_SERVER})" \
+          "log in at https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/, copy a fresh token, update CI_TOKEN in ${CONFIG_DIR}/config_${topology}.sh"
+      elif [[ "${HTTP_CODE}" == "200" ]]; then
+        check_pass "CI token in config_${topology}.sh accepted by CI cluster API (${CI_SERVER})"
+      else
+        check_warn "CI API token check: unexpected HTTP ${HTTP_CODE} from ${CI_SERVER}"
       fi
     fi
   fi
