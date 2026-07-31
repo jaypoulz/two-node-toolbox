@@ -59,13 +59,13 @@ make verify
 For targeted checks, run individual linters:
 
 ```bash
-make shellcheck      # Shell script linting (auto-fixes by default)
-make yamlfmt         # YAML formatting (auto-fixes by default)
+make shellcheck      # Shell script linting
+make yamlfmt         # YAML formatting (auto-formats by default)
 make ansible-lint    # Ansible linting + playbook syntax check
 ```
 
-`make shellcheck` and `make yamlfmt` auto-fix files by default. `make verify`
-runs them in validate-only mode (no modifications).
+`make yamlfmt` auto-formats files by default. `make verify` runs it in
+validate-only mode (no modifications). `make shellcheck` is read-only.
 
 ## Code Standards
 
@@ -95,9 +95,9 @@ installation is required beyond a container engine.
 - Playbooks must pass `ansible-playbook --syntax-check` (run automatically
   by `make ansible-lint`)
 
-### Python
+### Python (when applicable)
 
-- PEP 8 compliance, must pass ruff
+- PEP 8 compliance, must pass ruff (checked by CodeRabbit on PRs)
 - Use f-strings for formatting
 
 ## Testing
